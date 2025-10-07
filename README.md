@@ -6,6 +6,12 @@ A full-stack personal expense tracking application to help users understand thei
 
 - **Expense Entry Form**: Log expenses with amount, category, date, and optional notes
 - **Expense List View**: View, edit, and delete expenses
+- **Expense Filtering**: Filter expenses by date range and/or category
+  - Filter by single category or all categories
+  - Filter by date range (start date, end date, or both)
+  - Combine category and date filters
+  - Visual indicators for active filters
+  - One-click filter clear
 - **Spending Summary**: Visualize spending by category with charts and monthly totals
 - **Budget Tracking**: Set monthly budget limits and track spending progress
   - Set and update monthly budget limit
@@ -130,6 +136,7 @@ docker-compose up --build
 
 ### Expenses
 - `GET /api/expenses` - Get all expenses
+- `GET /api/expenses/filter` - Get filtered expenses (query params: category, startDate, endDate)
 - `GET /api/expenses/{id}` - Get expense by ID
 - `POST /api/expenses` - Create new expense
 - `PUT /api/expenses/{id}` - Update expense

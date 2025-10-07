@@ -1,14 +1,17 @@
 package com.expensetracker.controller;
 
 import com.expensetracker.dto.*;
+import com.expensetracker.model.ExpenseCategory;
 import com.expensetracker.service.ExpenseService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -24,6 +27,16 @@ public class ExpenseController {
     public ResponseEntity<List<ExpenseResponse>> getAllExpenses() {
         log.info("GET /api/expenses - Fetching all expenses");
         List<ExpenseResponse> expenses = expenseService.getAllExpenses();
+        return ResponseEntity.ok(expenses);
+    }
+    
+    @GetMapping("/filter")
+    public ResponseEntity<List<ExpenseResponse>> getFilteredExpenses(
+            @RequestParam(required = false) List<ExpenseCategory> categories,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        log.info("GET /api/expenses/filter - categories: {}, startDate: {}, endDate: {}", categories, startDate, endDate);
+        List<ExpenseResponse> expenses = expenseService.getFilteredExpenses(categories, startDate, endDate);
         return ResponseEntity.ok(expenses);
     }
     

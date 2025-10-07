@@ -70,6 +70,18 @@ export const expenseApi = {
     return response.data
   },
 
+  getFilteredExpenses: async (categories?: ExpenseCategory[], startDate?: string, endDate?: string): Promise<Expense[]> => {
+    const params = new URLSearchParams()
+    if (categories && categories.length > 0) {
+      categories.forEach(cat => params.append('categories', cat))
+    }
+    if (startDate) params.append('startDate', startDate)
+    if (endDate) params.append('endDate', endDate)
+    
+    const response = await api.get<Expense[]>(`/expenses/filter?${params.toString()}`)
+    return response.data
+  },
+
   getExpenseById: async (id: number): Promise<Expense> => {
     const response = await api.get<Expense>(`/expenses/${id}`)
     return response.data

@@ -5,7 +5,8 @@ import { ExpenseForm } from "@/components/ExpenseForm"
 import { ExpenseList } from "@/components/ExpenseList"
 import { SpendingSummary } from "@/components/SpendingSummary"
 import { BudgetTracker } from "@/components/BudgetTracker"
-import { expenseApi, type Expense, type CategorySummary, type MonthlySummary } from "@/lib/api"
+import { ExpenseFilter } from "@/components/ExpenseFilter"
+import { expenseApi, type Expense, type CategorySummary, type MonthlySummary, ExpenseCategory } from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
 import { Wallet } from "lucide-react"
 
@@ -19,11 +20,14 @@ export default function Home() {
     year: new Date().getFullYear(),
   })
   const [loading, setLoading] = useState(true)
+  const [filterCategories, setFilterCategories] = useState<ExpenseCategory[]>([])
+  const [filterStartDate, setFilterStartDate] = useState<string | undefined>(undefined)
+  const [filterEndDate, setFilterEndDate] = useState<string | undefined>(undefined)
 
   const loadData = useCallback(async () => {
     try {
       const [expensesData, categoryData, monthlyData] = await Promise.all([
-        expenseApi.getAllExpenses(),
+        expenseApi.getFilteredExpenses(filterCategories.length > 0 ? filterCategories : undefined, filterStartDate, filterEndDate),
         expenseApi.getCategorySummary(),
         expenseApi.getMonthlySummary(),
       ])
@@ -42,7 +46,13 @@ export default function Home() {
     } finally {
       setLoading(false)
     }
-  }, [toast])
+  }, [toast, filterCategories, filterStartDate, filterEndDate])
+
+  const handleFilter = useCallback((categories: ExpenseCategory[], startDate?: string, endDate?: string) => {
+    setFilterCategories(categories)
+    setFilterStartDate(startDate)
+    setFilterEndDate(endDate)
+  }, [])
 
   useEffect(() => {
     loadData()
@@ -74,9 +84,10 @@ export default function Home() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Form and List */}
+          {/* Left Column - Form, Filter, and List */}
           <div className="lg:col-span-2 space-y-6">
             <ExpenseForm onSuccess={loadData} />
+            <ExpenseFilter onFilter={handleFilter} />
             <ExpenseList expenses={expenses} onUpdate={loadData} />
           </div>
 

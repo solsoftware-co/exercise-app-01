@@ -3,6 +3,7 @@ package com.expensetracker.service;
 import com.expensetracker.dto.*;
 import com.expensetracker.exception.ResourceNotFoundException;
 import com.expensetracker.model.Expense;
+import com.expensetracker.model.ExpenseCategory;
 import com.expensetracker.repository.ExpenseRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +27,34 @@ public class ExpenseService {
     public List<ExpenseResponse> getAllExpenses() {
         log.debug("Fetching all expenses");
         return expenseRepository.findAll().stream()
+            .map(ExpenseResponse::fromEntity)
+            .collect(Collectors.toList());
+    }
+    
+    @Transactional(readOnly = true)
+    public List<ExpenseResponse> getFilteredExpenses(List<ExpenseCategory> categories, LocalDate startDate, LocalDate endDate) {
+        log.debug("Fetching filtered expenses - categories: {}, startDate: {}, endDate: {}", categories, startDate, endDate);
+        
+        List<Expense> expenses;
+        
+        boolean hasCategories = categories != null && !categories.isEmpty();
+        boolean hasDateRange = startDate != null && endDate != null;
+        
+        if (hasCategories && hasDateRange) {
+            // Filter by both categories and date range
+            expenses = expenseRepository.findByCategoryInAndDateBetweenOrderByDateDesc(categories, startDate, endDate);
+        } else if (hasCategories) {
+            // Filter by categories only
+            expenses = expenseRepository.findByCategoryInOrderByDateDesc(categories);
+        } else if (hasDateRange) {
+            // Filter by date range only
+            expenses = expenseRepository.findByDateBetweenOrderByDateDesc(startDate, endDate);
+        } else {
+            // No filters, return all
+            expenses = expenseRepository.findAll();
+        }
+        
+        return expenses.stream()
             .map(ExpenseResponse::fromEntity)
             .collect(Collectors.toList());
     }
