@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { expenseApi, ExpenseCategory, type Expense, type ExpenseRequest } from "@/lib/api"
+import { expenseApi, categoryApi, type Expense, type ExpenseRequest, type Category } from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
 
 interface ExpenseFormProps {
@@ -25,23 +25,46 @@ interface ExpenseFormProps {
 export function ExpenseForm({ expense, onSuccess, onCancel }: ExpenseFormProps) {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
+  const [categories, setCategories] = useState<Category[]>([])
   const [formData, setFormData] = useState<ExpenseRequest>({
     amount: 0,
-    category: ExpenseCategory.OTHER,
+    categoryId: 0,
     date: new Date().toISOString().split('T')[0],
     description: '',
   })
 
   useEffect(() => {
-    if (expense) {
+    loadCategories()
+  }, [])
+
+  useEffect(() => {
+    if (expense && categories.length > 0) {
+      const category = categories.find(c => c.name === expense.category)
       setFormData({
         amount: expense.amount,
-        category: expense.category,
+        categoryId: category?.id || categories[0]?.id || 0,
         date: expense.date,
         description: expense.description || '',
       })
     }
-  }, [expense])
+  }, [expense, categories])
+
+  const loadCategories = async () => {
+    try {
+      const data = await categoryApi.getAllCategories()
+      setCategories(data.sort((a, b) => a.name.localeCompare(b.name)))
+      // Set default category if creating new expense
+      if (!expense && data.length > 0) {
+        setFormData(prev => ({ ...prev, categoryId: data[0].id }))
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load categories",
+        variant: "destructive",
+      })
+    }
+  }
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -62,7 +85,7 @@ export function ExpenseForm({ expense, onSuccess, onCancel }: ExpenseFormProps) 
         })
         setFormData({
           amount: 0,
-          category: ExpenseCategory.OTHER,
+          categoryId: categories[0]?.id || 0,
           date: new Date().toISOString().split('T')[0],
           description: '',
         })
@@ -102,18 +125,18 @@ export function ExpenseForm({ expense, onSuccess, onCancel }: ExpenseFormProps) 
           <div className="space-y-2">
             <Label htmlFor="category">Category</Label>
             <Select
-              value={formData.category}
-              onValueChange={(value) => setFormData({ ...formData, category: value as ExpenseCategory })}
+              value={formData.categoryId.toString()}
+              onValueChange={(value) => setFormData({ ...formData, categoryId: parseInt(value) })}
             >
               <SelectTrigger id="category">
                 <SelectValue placeholder="Select a category" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={ExpenseCategory.GROCERIES}>Groceries</SelectItem>
-                <SelectItem value={ExpenseCategory.TRANSPORTATION}>Transportation</SelectItem>
-                <SelectItem value={ExpenseCategory.ENTERTAINMENT}>Entertainment</SelectItem>
-                <SelectItem value={ExpenseCategory.UTILITIES}>Utilities</SelectItem>
-                <SelectItem value={ExpenseCategory.OTHER}>Other</SelectItem>
+                {categories.map((category) => (
+                  <SelectItem key={category.id} value={category.id.toString()}>
+                    {category.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

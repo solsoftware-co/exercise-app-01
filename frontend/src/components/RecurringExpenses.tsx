@@ -21,7 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { recurringExpenseApi, ExpenseCategory, RecurrenceFrequency, type RecurringExpense, type RecurringExpenseRequest } from "@/lib/api"
+import { recurringExpenseApi, categoryApi, RecurrenceFrequency, type RecurringExpense, type RecurringExpenseRequest, type Category } from "@/lib/api"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import { Plus, Repeat, Trash2, Power, PowerOff, Edit } from "lucide-react"
@@ -33,13 +33,14 @@ interface RecurringExpensesProps {
 export function RecurringExpenses({ onUpdate }: RecurringExpensesProps) {
   const { toast } = useToast()
   const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpense[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState<RecurringExpenseRequest>({
     amount: 0,
-    category: ExpenseCategory.OTHER,
+    categoryId: 0,
     description: '',
     frequency: RecurrenceFrequency.MONTHLY,
     startDate: new Date().toISOString().split('T')[0],
@@ -48,6 +49,7 @@ export function RecurringExpenses({ onUpdate }: RecurringExpensesProps) {
 
   useEffect(() => {
     loadRecurringExpenses()
+    loadCategories()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -66,12 +68,28 @@ export function RecurringExpenses({ onUpdate }: RecurringExpensesProps) {
     }
   }
 
+  const loadCategories = async () => {
+    try {
+      const data = await categoryApi.getAllCategories()
+      setCategories(data.sort((a, b) => a.name.localeCompare(b.name)))
+      if (data.length > 0 && formData.categoryId === 0) {
+        setFormData(prev => ({ ...prev, categoryId: data[0].id }))
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load categories",
+        variant: "destructive",
+      })
+    }
+  }
+
   const handleOpenDialog = () => {
     setIsEditing(false)
     setEditingId(null)
     setFormData({
       amount: 0,
-      category: ExpenseCategory.OTHER,
+      categoryId: categories[0]?.id || 0,
       description: '',
       frequency: RecurrenceFrequency.MONTHLY,
       startDate: new Date().toISOString().split('T')[0],
@@ -81,11 +99,12 @@ export function RecurringExpenses({ onUpdate }: RecurringExpensesProps) {
   }
 
   const handleEdit = (expense: RecurringExpense) => {
+    const category = categories.find(c => c.name === expense.category)
     setIsEditing(true)
     setEditingId(expense.id)
     setFormData({
       amount: expense.amount,
-      category: expense.category,
+      categoryId: category?.id || categories[0]?.id || 0,
       description: expense.description || '',
       frequency: expense.frequency,
       startDate: expense.startDate,
@@ -117,7 +136,7 @@ export function RecurringExpenses({ onUpdate }: RecurringExpensesProps) {
       setEditingId(null)
       setFormData({
         amount: 0,
-        category: ExpenseCategory.OTHER,
+        categoryId: categories[0]?.id || 0,
         description: '',
         frequency: RecurrenceFrequency.MONTHLY,
         startDate: new Date().toISOString().split('T')[0],
@@ -316,18 +335,18 @@ export function RecurringExpenses({ onUpdate }: RecurringExpensesProps) {
             <div className="space-y-2">
               <Label htmlFor="recurring-category">Category</Label>
               <Select
-                value={formData.category}
-                onValueChange={(value) => setFormData({ ...formData, category: value as ExpenseCategory })}
+                value={formData.categoryId.toString()}
+                onValueChange={(value) => setFormData({ ...formData, categoryId: parseInt(value) })}
               >
                 <SelectTrigger id="recurring-category">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ExpenseCategory.GROCERIES}>Groceries</SelectItem>
-                  <SelectItem value={ExpenseCategory.TRANSPORTATION}>Transportation</SelectItem>
-                  <SelectItem value={ExpenseCategory.ENTERTAINMENT}>Entertainment</SelectItem>
-                  <SelectItem value={ExpenseCategory.UTILITIES}>Utilities</SelectItem>
-                  <SelectItem value={ExpenseCategory.OTHER}>Other</SelectItem>
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={category.id.toString()}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

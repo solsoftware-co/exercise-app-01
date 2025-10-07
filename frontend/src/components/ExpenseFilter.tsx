@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -12,27 +12,47 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ExpenseCategory } from "@/lib/api"
+import { categoryApi, type Category } from "@/lib/api"
+import { useToast } from "@/components/ui/use-toast"
 import { Filter, X } from "lucide-react"
 
 interface ExpenseFilterProps {
-  onFilter: (categories: ExpenseCategory[], startDate?: string, endDate?: string) => void
+  onFilter: (categories: string[], startDate?: string, endDate?: string) => void
 }
 
 export function ExpenseFilter({ onFilter }: ExpenseFilterProps) {
-  const [selectedCategories, setSelectedCategories] = useState<ExpenseCategory[]>([])
+  const { toast } = useToast()
+  const [categories, setCategories] = useState<Category[]>([])
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [startDate, setStartDate] = useState<string>("")
   const [endDate, setEndDate] = useState<string>("")
   const [isExpanded, setIsExpanded] = useState(false)
 
+  useEffect(() => {
+    loadCategories()
+  }, [])
+
+  const loadCategories = async () => {
+    try {
+      const data = await categoryApi.getAllCategories()
+      setCategories(data.sort((a, b) => a.name.localeCompare(b.name)))
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load categories",
+        variant: "destructive",
+      })
+    }
+  }
+
   const handleAddCategory = (category: string) => {
-    if (category !== "all" && !selectedCategories.includes(category as ExpenseCategory)) {
-      const newCategories = [...selectedCategories, category as ExpenseCategory]
+    if (category !== "placeholder" && !selectedCategories.includes(category)) {
+      const newCategories = [...selectedCategories, category]
       setSelectedCategories(newCategories)
     }
   }
 
-  const handleRemoveCategory = (category: ExpenseCategory) => {
+  const handleRemoveCategory = (category: string) => {
     const newCategories = selectedCategories.filter(c => c !== category)
     setSelectedCategories(newCategories)
     // Auto-apply filter when removing a category
@@ -101,11 +121,15 @@ export function ExpenseFilter({ onFilter }: ExpenseFilterProps) {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="placeholder" disabled>Select categories...</SelectItem>
-              <SelectItem value={ExpenseCategory.GROCERIES}>Groceries</SelectItem>
-              <SelectItem value={ExpenseCategory.TRANSPORTATION}>Transportation</SelectItem>
-              <SelectItem value={ExpenseCategory.ENTERTAINMENT}>Entertainment</SelectItem>
-              <SelectItem value={ExpenseCategory.UTILITIES}>Utilities</SelectItem>
-              <SelectItem value={ExpenseCategory.OTHER}>Other</SelectItem>
+              {categories.map((category) => (
+                <SelectItem 
+                  key={category.id} 
+                  value={category.name}
+                  disabled={selectedCategories.includes(category.name)}
+                >
+                  {category.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
           
@@ -117,7 +141,7 @@ export function ExpenseFilter({ onFilter }: ExpenseFilterProps) {
                   key={cat}
                   className="inline-flex items-center gap-1 px-3 py-1 bg-primary text-primary-foreground rounded-full text-sm"
                 >
-                  {cat.charAt(0) + cat.slice(1).toLowerCase()}
+                  {cat}
                   <button
                     type="button"
                     onClick={() => handleRemoveCategory(cat)}

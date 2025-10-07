@@ -5,30 +5,36 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api'
 export interface Expense {
   id: number
   amount: number
-  category: ExpenseCategory
+  category: string
   date: string
   description?: string
   createdAt: string
   updatedAt: string
 }
 
-export enum ExpenseCategory {
-  GROCERIES = 'GROCERIES',
-  TRANSPORTATION = 'TRANSPORTATION',
-  ENTERTAINMENT = 'ENTERTAINMENT',
-  UTILITIES = 'UTILITIES',
-  OTHER = 'OTHER',
+export interface Category {
+  id: number
+  name: string
+  description?: string
+  isDefault: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CategoryRequest {
+  name: string
+  description?: string
 }
 
 export interface ExpenseRequest {
   amount: number
-  category: ExpenseCategory
+  categoryId: number
   date: string
   description?: string
 }
 
 export interface CategorySummary {
-  category: ExpenseCategory
+  category: string
   total: number
 }
 
@@ -60,7 +66,7 @@ export interface BudgetStatus {
 export interface RecurringExpense {
   id: number
   amount: number
-  category: ExpenseCategory
+  category: string
   description?: string
   frequency: RecurrenceFrequency
   startDate: string
@@ -73,7 +79,7 @@ export interface RecurringExpense {
 
 export interface RecurringExpenseRequest {
   amount: number
-  category: ExpenseCategory
+  categoryId: number
   description?: string
   frequency: RecurrenceFrequency
   startDate: string
@@ -102,7 +108,7 @@ export const expenseApi = {
     return response.data
   },
 
-  getFilteredExpenses: async (categories?: ExpenseCategory[], startDate?: string, endDate?: string): Promise<Expense[]> => {
+  getFilteredExpenses: async (categories?: string[], startDate?: string, endDate?: string): Promise<Expense[]> => {
     const params = new URLSearchParams()
     if (categories && categories.length > 0) {
       categories.forEach(cat => params.append('categories', cat))
@@ -158,6 +164,32 @@ export const budgetApi = {
   getBudgetStatus: async (): Promise<BudgetStatus> => {
     const response = await api.get<BudgetStatus>('/budget/status')
     return response.data
+  },
+}
+
+export const categoryApi = {
+  getAllCategories: async (): Promise<Category[]> => {
+    const response = await api.get<Category[]>('/categories')
+    return response.data
+  },
+
+  getCategoryById: async (id: number): Promise<Category> => {
+    const response = await api.get<Category>(`/categories/${id}`)
+    return response.data
+  },
+
+  createCategory: async (category: CategoryRequest): Promise<Category> => {
+    const response = await api.post<Category>('/categories', category)
+    return response.data
+  },
+
+  updateCategory: async (id: number, category: CategoryRequest): Promise<Category> => {
+    const response = await api.put<Category>(`/categories/${id}`, category)
+    return response.data
+  },
+
+  deleteCategory: async (id: number): Promise<void> => {
+    await api.delete(`/categories/${id}`)
   },
 }
 

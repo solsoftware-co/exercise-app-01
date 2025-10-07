@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Pencil, Trash2 } from "lucide-react"
+import { Pencil, Trash2, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { expenseApi, type Expense } from "@/lib/api"
-import { formatCurrency, formatDate } from "@/lib/utils"
+import { formatCurrency, formatDate, exportExpensesToCSV } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import { ExpenseForm } from "./ExpenseForm"
 
@@ -66,6 +66,15 @@ export function ExpenseList({ expenses, onUpdate }: ExpenseListProps) {
     return category.charAt(0) + category.slice(1).toLowerCase()
   }
 
+  const handleExport = () => {
+    const timestamp = new Date().toISOString().split('T')[0]
+    exportExpensesToCSV(expenses, `expenses-${timestamp}.csv`)
+    toast({
+      title: "Success",
+      description: `Exported ${expenses.length} expense${expenses.length === 1 ? '' : 's'} to CSV`,
+    })
+  }
+
   if (expenses.length === 0) {
     return (
       <Card>
@@ -85,7 +94,18 @@ export function ExpenseList({ expenses, onUpdate }: ExpenseListProps) {
     <>
       <Card>
         <CardHeader>
-          <CardTitle>Expenses</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Expenses</CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExport}
+              disabled={expenses.length === 0}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export CSV
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">

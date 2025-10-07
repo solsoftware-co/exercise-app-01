@@ -7,7 +7,8 @@ import { SpendingSummary } from "@/components/SpendingSummary"
 import { BudgetTracker } from "@/components/BudgetTracker"
 import { ExpenseFilter } from "@/components/ExpenseFilter"
 import { RecurringExpenses } from "@/components/RecurringExpenses"
-import { expenseApi, type Expense, type CategorySummary, type MonthlySummary, ExpenseCategory } from "@/lib/api"
+import { CategoryManagement } from "@/components/CategoryManagement"
+import { expenseApi, type Expense, type CategorySummary, type MonthlySummary } from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
 import { Wallet } from "lucide-react"
 
@@ -21,7 +22,7 @@ export default function Home() {
     year: new Date().getFullYear(),
   })
   const [loading, setLoading] = useState(true)
-  const [filterCategories, setFilterCategories] = useState<ExpenseCategory[]>([])
+  const [filterCategories, setFilterCategories] = useState<string[]>([])
   const [filterStartDate, setFilterStartDate] = useState<string | undefined>(undefined)
   const [filterEndDate, setFilterEndDate] = useState<string | undefined>(undefined)
 
@@ -49,7 +50,7 @@ export default function Home() {
     }
   }, [toast, filterCategories, filterStartDate, filterEndDate])
 
-  const handleFilter = useCallback((categories: ExpenseCategory[], startDate?: string, endDate?: string) => {
+  const handleFilter = useCallback((categories: string[], startDate?: string, endDate?: string) => {
     setFilterCategories(categories)
     setFilterStartDate(startDate)
     setFilterEndDate(endDate)
@@ -93,9 +94,10 @@ export default function Home() {
             <ExpenseList expenses={expenses} onUpdate={loadData} />
           </div>
 
-          {/* Right Column - Budget and Summary */}
+          {/* Right Column - Budget, Categories, and Summary */}
           <div className="lg:col-span-1 space-y-6">
             <BudgetTracker onBudgetChange={loadData} />
+            <CategoryManagement onUpdate={loadData} />
             <SpendingSummary
               categorySummary={categorySummary}
               monthlySummary={monthlySummary}
