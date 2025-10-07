@@ -57,6 +57,38 @@ export interface BudgetStatus {
   status: 'HEALTHY' | 'WARNING' | 'OVER_BUDGET'
 }
 
+export interface RecurringExpense {
+  id: number
+  amount: number
+  category: ExpenseCategory
+  description?: string
+  frequency: RecurrenceFrequency
+  startDate: string
+  endDate?: string
+  nextOccurrence: string
+  active: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface RecurringExpenseRequest {
+  amount: number
+  category: ExpenseCategory
+  description?: string
+  frequency: RecurrenceFrequency
+  startDate: string
+  endDate?: string
+}
+
+export enum RecurrenceFrequency {
+  DAILY = 'DAILY',
+  WEEKLY = 'WEEKLY',
+  BIWEEKLY = 'BIWEEKLY',
+  MONTHLY = 'MONTHLY',
+  QUARTERLY = 'QUARTERLY',
+  YEARLY = 'YEARLY',
+}
+
 const api = axios.create({
   baseURL: API_URL,
   headers: {
@@ -126,5 +158,44 @@ export const budgetApi = {
   getBudgetStatus: async (): Promise<BudgetStatus> => {
     const response = await api.get<BudgetStatus>('/budget/status')
     return response.data
+  },
+}
+
+export const recurringExpenseApi = {
+  getAllRecurringExpenses: async (): Promise<RecurringExpense[]> => {
+    const response = await api.get<RecurringExpense[]>('/recurring-expenses')
+    return response.data
+  },
+
+  getActiveRecurringExpenses: async (): Promise<RecurringExpense[]> => {
+    const response = await api.get<RecurringExpense[]>('/recurring-expenses/active')
+    return response.data
+  },
+
+  getRecurringExpenseById: async (id: number): Promise<RecurringExpense> => {
+    const response = await api.get<RecurringExpense>(`/recurring-expenses/${id}`)
+    return response.data
+  },
+
+  createRecurringExpense: async (expense: RecurringExpenseRequest): Promise<RecurringExpense> => {
+    const response = await api.post<RecurringExpense>('/recurring-expenses', expense)
+    return response.data
+  },
+
+  updateRecurringExpense: async (id: number, expense: RecurringExpenseRequest): Promise<RecurringExpense> => {
+    const response = await api.put<RecurringExpense>(`/recurring-expenses/${id}`, expense)
+    return response.data
+  },
+
+  deleteRecurringExpense: async (id: number): Promise<void> => {
+    await api.delete(`/recurring-expenses/${id}`)
+  },
+
+  toggleRecurringExpense: async (id: number, active: boolean): Promise<void> => {
+    await api.patch(`/recurring-expenses/${id}/toggle?active=${active}`)
+  },
+
+  processRecurringExpenses: async (): Promise<void> => {
+    await api.post('/recurring-expenses/process')
   },
 }

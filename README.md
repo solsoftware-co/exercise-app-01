@@ -19,6 +19,13 @@ A full-stack personal expense tracking application to help users understand thei
   - Automatic warnings at 80% budget usage
   - Over-budget alerts when spending exceeds limit
   - Remaining budget calculation
+- **Recurring Expenses**: Automate regular expense tracking
+  - Set up expenses that repeat automatically (daily, weekly, bi-weekly, monthly, quarterly, yearly)
+  - One-time setup for recurring bills (rent, subscriptions, utilities)
+  - Automatic expense creation via scheduled job (runs daily at 1 AM)
+  - Toggle active/inactive status
+  - Optional end date for temporary recurring expenses
+  - View next occurrence date
 
 ## Tech Stack
 
@@ -150,6 +157,16 @@ docker-compose up --build
 - `GET /api/budget` - Get current budget settings
 - `POST /api/budget` - Set or update monthly budget limit
 - `GET /api/budget/status` - Get budget status with spending progress
+
+### Recurring Expenses
+- `GET /api/recurring-expenses` - Get all recurring expenses
+- `GET /api/recurring-expenses/active` - Get active recurring expenses only
+- `GET /api/recurring-expenses/{id}` - Get recurring expense by ID
+- `POST /api/recurring-expenses` - Create new recurring expense
+- `PUT /api/recurring-expenses/{id}` - Update recurring expense
+- `DELETE /api/recurring-expenses/{id}` - Delete recurring expense
+- `PATCH /api/recurring-expenses/{id}/toggle` - Toggle active/inactive status
+- `POST /api/recurring-expenses/process` - Manually trigger recurring expense processing
 
 ## Project Structure
 

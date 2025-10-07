@@ -6,6 +6,7 @@ import { ExpenseList } from "@/components/ExpenseList"
 import { SpendingSummary } from "@/components/SpendingSummary"
 import { BudgetTracker } from "@/components/BudgetTracker"
 import { ExpenseFilter } from "@/components/ExpenseFilter"
+import { RecurringExpenses } from "@/components/RecurringExpenses"
 import { expenseApi, type Expense, type CategorySummary, type MonthlySummary, ExpenseCategory } from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
 import { Wallet } from "lucide-react"
@@ -88,6 +89,7 @@ export default function Home() {
           <div className="lg:col-span-2 space-y-6">
             <ExpenseForm onSuccess={loadData} />
             <ExpenseFilter onFilter={handleFilter} />
+            <RecurringExpenses onUpdate={loadData} />
             <ExpenseList expenses={expenses} onUpdate={loadData} />
           </div>
 
