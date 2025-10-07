@@ -1,0 +1,72 @@
+name: CD - Deploy to Production
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+
+env:
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GKE_CLUSTER: ${{ secrets.GKE_CLUSTER_PRODUCTION }}
+  GKE_REGION: ${{ secrets.GKE_REGION }}
+  IMAGE_TAG: production-${{ github.sha }}
+
+jobs:
+  build-and-deploy:
+    name: Build and Deploy to Production
+    runs-on: ubuntu-latest
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+    
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+    
+    - name: Configure Docker for GCR
+      run: gcloud auth configure-docker
+    
+    - name: Build and push backend image
+      working-directory: ./backend
+      run: |
+        docker build -t gcr.io/$GCP_PROJECT_ID/expense-tracker-backend:$IMAGE_TAG .
+        docker push gcr.io/$GCP_PROJECT_ID/expense-tracker-backend:$IMAGE_TAG
+        docker tag gcr.io/$GCP_PROJECT_ID/expense-tracker-backend:$IMAGE_TAG \
+          gcr.io/$GCP_PROJECT_ID/expense-tracker-backend:production-latest
+        docker push gcr.io/$GCP_PROJECT_ID/expense-tracker-backend:production-latest
+    
+    - name: Build and push frontend image
+      working-directory: ./frontend
+      run: |
+        docker build -t gcr.io/$GCP_PROJECT_ID/expense-tracker-frontend:$IMAGE_TAG .
+        docker push gcr.io/$GCP_PROJECT_ID/expense-tracker-frontend:$IMAGE_TAG
+        docker tag gcr.io/$GCP_PROJECT_ID/expense-tracker-frontend:$IMAGE_TAG \
+          gcr.io/$GCP_PROJECT_ID/expense-tracker-frontend:production-latest
+        docker push gcr.io/$GCP_PROJECT_ID/expense-tracker-frontend:production-latest
+    
+    - name: Get GKE credentials
+      run: |
+        gcloud container clusters get-credentials $GKE_CLUSTER --region $GKE_REGION
+    
+    - name: Deploy to GKE
+      run: |
+        kubectl apply -k k8s/overlays/production
+        kubectl rollout status deployment/prod-backend -n expense-tracker-production
+        kubectl rollout status deployment/prod-frontend -n expense-tracker-production
+    
+    - name: Verify deployment
+      run: |
+        kubectl get pods -n expense-tracker-production
+        kubectl get services -n expense-tracker-production
+    
+    - name: Run smoke tests
+      run: |
+        echo "Running smoke tests..."
+        # Add your smoke test commands here

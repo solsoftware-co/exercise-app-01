@@ -1,0 +1,14 @@
+target/
+.mvn/
+mvnw
+mvnw.cmd
+*.class
+*.jar
+*.war
+*.ear
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store

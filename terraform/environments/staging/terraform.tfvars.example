@@ -1,0 +1,8 @@
+project_id    = "your-gcp-project-id"
+region        = "us-central1"
+environment   = "staging"
+cluster_name  = "expense-tracker-staging"
+node_count    = 2
+machine_type  = "e2-medium"
+min_node_count = 1
+max_node_count = 5
