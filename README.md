@@ -70,6 +70,35 @@ A full-stack personal expense tracking application to help users understand thei
    - Backend API: http://localhost:8080/api
    - API Health Check: http://localhost:8080/actuator/health
 
+### Sample Data Seeding
+
+The application automatically seeds sample expense data when running in **development mode** (`dev` profile). This happens automatically when you start the application with `docker-compose.dev.yml`.
+
+**What gets seeded:**
+- 25 sample expense records
+- Mix of current month and previous month expenses
+- All expense categories (Groceries, Transportation, Entertainment, Utilities, Other)
+- Realistic amounts and descriptions
+
+**Automatic Seeding:**
+When you run `docker-compose -f docker-compose.dev.yml up`, the backend automatically:
+1. Checks if the database is empty
+2. Seeds sample data if no expenses exist
+3. Skips seeding if data already exists
+
+**Manual Database Reset:**
+To clear the database and reseed with fresh data:
+
+```bash
+# Stop containers and remove volumes (this deletes all data)
+docker-compose -f docker-compose.dev.yml down -v
+
+# Start fresh with new seed data
+docker-compose -f docker-compose.dev.yml up
+```
+
+**Note:** Seeding only works in development mode. Production deployments will start with an empty database.
+
 ### Local Development without Docker
 
 #### Backend
