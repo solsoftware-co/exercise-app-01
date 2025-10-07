@@ -38,6 +38,25 @@ export interface MonthlySummary {
   year: number
 }
 
+export interface Budget {
+  id: number
+  monthlyLimit: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface BudgetRequest {
+  monthlyLimit: number
+}
+
+export interface BudgetStatus {
+  monthlyLimit: number
+  totalSpent: number
+  remaining: number
+  percentageUsed: number
+  status: 'HEALTHY' | 'WARNING' | 'OVER_BUDGET'
+}
+
 const api = axios.create({
   baseURL: API_URL,
   headers: {
@@ -77,6 +96,23 @@ export const expenseApi = {
 
   getMonthlySummary: async (): Promise<MonthlySummary> => {
     const response = await api.get<MonthlySummary>('/expenses/summary/monthly')
+    return response.data
+  },
+}
+
+export const budgetApi = {
+  getBudget: async (): Promise<Budget> => {
+    const response = await api.get<Budget>('/budget')
+    return response.data
+  },
+
+  setBudget: async (budget: BudgetRequest): Promise<Budget> => {
+    const response = await api.post<Budget>('/budget', budget)
+    return response.data
+  },
+
+  getBudgetStatus: async (): Promise<BudgetStatus> => {
+    const response = await api.get<BudgetStatus>('/budget/status')
     return response.data
   },
 }

@@ -7,6 +7,12 @@ A full-stack personal expense tracking application to help users understand thei
 - **Expense Entry Form**: Log expenses with amount, category, date, and optional notes
 - **Expense List View**: View, edit, and delete expenses
 - **Spending Summary**: Visualize spending by category with charts and monthly totals
+- **Budget Tracking**: Set monthly budget limits and track spending progress
+  - Set and update monthly budget limit
+  - Real-time budget status with visual progress bar
+  - Automatic warnings at 80% budget usage
+  - Over-budget alerts when spending exceeds limit
+  - Remaining budget calculation
 
 ## Tech Stack
 
@@ -132,6 +138,11 @@ docker-compose up --build
 ### Summary
 - `GET /api/expenses/summary/by-category` - Get spending by category
 - `GET /api/expenses/summary/monthly` - Get current month total
+
+### Budget
+- `GET /api/budget` - Get current budget settings
+- `POST /api/budget` - Set or update monthly budget limit
+- `GET /api/budget/status` - Get budget status with spending progress
 
 ## Project Structure
 

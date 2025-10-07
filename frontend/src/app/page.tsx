@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { ExpenseForm } from "@/components/ExpenseForm"
 import { ExpenseList } from "@/components/ExpenseList"
 import { SpendingSummary } from "@/components/SpendingSummary"
+import { BudgetTracker } from "@/components/BudgetTracker"
 import { expenseApi, type Expense, type CategorySummary, type MonthlySummary } from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
 import { Wallet } from "lucide-react"
@@ -79,8 +80,9 @@ export default function Home() {
             <ExpenseList expenses={expenses} onUpdate={loadData} />
           </div>
 
-          {/* Right Column - Summary */}
-          <div className="lg:col-span-1">
+          {/* Right Column - Budget and Summary */}
+          <div className="lg:col-span-1 space-y-6">
+            <BudgetTracker onBudgetChange={loadData} />
             <SpendingSummary
               categorySummary={categorySummary}
               monthlySummary={monthlySummary}
