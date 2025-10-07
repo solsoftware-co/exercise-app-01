@@ -2,8 +2,9 @@ package com.expensetracker.service;
 
 import com.expensetracker.dto.*;
 import com.expensetracker.exception.ResourceNotFoundException;
+import com.expensetracker.model.Category;
 import com.expensetracker.model.Expense;
-import com.expensetracker.model.ExpenseCategory;
+import com.expensetracker.repository.CategoryRepository;
 import com.expensetracker.repository.ExpenseRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +23,7 @@ import java.util.stream.Collectors;
 public class ExpenseService {
     
     private final ExpenseRepository expenseRepository;
+    private final CategoryRepository categoryRepository;
     
     @Transactional(readOnly = true)
     public List<ExpenseResponse> getAllExpenses() {
@@ -32,20 +34,20 @@ public class ExpenseService {
     }
     
     @Transactional(readOnly = true)
-    public List<ExpenseResponse> getFilteredExpenses(List<ExpenseCategory> categories, LocalDate startDate, LocalDate endDate) {
-        log.debug("Fetching filtered expenses - categories: {}, startDate: {}, endDate: {}", categories, startDate, endDate);
+    public List<ExpenseResponse> getFilteredExpenses(List<String> categoryNames, LocalDate startDate, LocalDate endDate) {
+        log.debug("Fetching filtered expenses - categories: {}, startDate: {}, endDate: {}", categoryNames, startDate, endDate);
         
         List<Expense> expenses;
         
-        boolean hasCategories = categories != null && !categories.isEmpty();
+        boolean hasCategories = categoryNames != null && !categoryNames.isEmpty();
         boolean hasDateRange = startDate != null && endDate != null;
         
         if (hasCategories && hasDateRange) {
             // Filter by both categories and date range
-            expenses = expenseRepository.findByCategoryInAndDateBetweenOrderByDateDesc(categories, startDate, endDate);
+            expenses = expenseRepository.findByCategoryNamesAndDateBetweenOrderByDateDesc(categoryNames, startDate, endDate);
         } else if (hasCategories) {
             // Filter by categories only
-            expenses = expenseRepository.findByCategoryInOrderByDateDesc(categories);
+            expenses = expenseRepository.findByCategoryNamesOrderByDateDesc(categoryNames);
         } else if (hasDateRange) {
             // Filter by date range only
             expenses = expenseRepository.findByDateBetweenOrderByDateDesc(startDate, endDate);
@@ -70,9 +72,13 @@ public class ExpenseService {
     @Transactional
     public ExpenseResponse createExpense(ExpenseRequest request) {
         log.info("Creating new expense: {}", request);
+        
+        Category category = categoryRepository.findById(request.getCategoryId())
+            .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + request.getCategoryId()));
+        
         Expense expense = new Expense();
         expense.setAmount(request.getAmount());
-        expense.setCategory(request.getCategory());
+        expense.setCategory(category);
         expense.setDate(request.getDate());
         expense.setDescription(request.getDescription());
         
@@ -87,8 +93,11 @@ public class ExpenseService {
         Expense expense = expenseRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Expense not found with id: " + id));
         
+        Category category = categoryRepository.findById(request.getCategoryId())
+            .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + request.getCategoryId()));
+        
         expense.setAmount(request.getAmount());
-        expense.setCategory(request.getCategory());
+        expense.setCategory(category);
         expense.setDate(request.getDate());
         expense.setDescription(request.getDescription());
         

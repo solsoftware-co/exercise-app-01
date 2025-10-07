@@ -1,6 +1,5 @@
 package com.expensetracker.dto;
 
-import com.expensetracker.model.ExpenseCategory;
 import com.expensetracker.model.RecurringExpense;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -16,7 +15,7 @@ import java.time.LocalDateTime;
 public class RecurringExpenseResponse {
     private Long id;
     private BigDecimal amount;
-    private ExpenseCategory category;
+    private String category;
     private String description;
     private RecurringExpense.RecurrenceFrequency frequency;
     private LocalDate startDate;
@@ -30,7 +29,7 @@ public class RecurringExpenseResponse {
         return new RecurringExpenseResponse(
             recurringExpense.getId(),
             recurringExpense.getAmount(),
-            recurringExpense.getCategory(),
+            recurringExpense.getCategory().getName(),
             recurringExpense.getDescription(),
             recurringExpense.getFrequency(),
             recurringExpense.getStartDate(),

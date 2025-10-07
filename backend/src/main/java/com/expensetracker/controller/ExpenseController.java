@@ -1,7 +1,6 @@
 package com.expensetracker.controller;
 
 import com.expensetracker.dto.*;
-import com.expensetracker.model.ExpenseCategory;
 import com.expensetracker.service.ExpenseService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -32,7 +31,7 @@ public class ExpenseController {
     
     @GetMapping("/filter")
     public ResponseEntity<List<ExpenseResponse>> getFilteredExpenses(
-            @RequestParam(required = false) List<ExpenseCategory> categories,
+            @RequestParam(required = false) List<String> categories,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         log.info("GET /api/expenses/filter - categories: {}, startDate: {}, endDate: {}", categories, startDate, endDate);

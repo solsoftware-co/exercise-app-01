@@ -1,6 +1,5 @@
 package com.expensetracker.dto;
 
-import com.expensetracker.model.ExpenseCategory;
 import com.expensetracker.model.RecurringExpense;
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
@@ -20,7 +19,7 @@ public class RecurringExpenseRequest {
     private BigDecimal amount;
     
     @NotNull(message = "Category is required")
-    private ExpenseCategory category;
+    private Long categoryId;
     
     @Size(max = 500, message = "Description must not exceed 500 characters")
     private String description;

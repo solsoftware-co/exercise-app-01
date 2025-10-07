@@ -3,8 +3,10 @@ package com.expensetracker.service;
 import com.expensetracker.dto.RecurringExpenseRequest;
 import com.expensetracker.dto.RecurringExpenseResponse;
 import com.expensetracker.exception.ResourceNotFoundException;
+import com.expensetracker.model.Category;
 import com.expensetracker.model.Expense;
 import com.expensetracker.model.RecurringExpense;
+import com.expensetracker.repository.CategoryRepository;
 import com.expensetracker.repository.ExpenseRepository;
 import com.expensetracker.repository.RecurringExpenseRepository;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +26,7 @@ public class RecurringExpenseService {
     
     private final RecurringExpenseRepository recurringExpenseRepository;
     private final ExpenseRepository expenseRepository;
+    private final CategoryRepository categoryRepository;
     
     @Transactional(readOnly = true)
     public List<RecurringExpenseResponse> getAllRecurringExpenses() {
@@ -52,9 +55,13 @@ public class RecurringExpenseService {
     @Transactional
     public RecurringExpenseResponse createRecurringExpense(RecurringExpenseRequest request) {
         log.info("Creating new recurring expense: {}", request);
+        
+        Category category = categoryRepository.findById(request.getCategoryId())
+            .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + request.getCategoryId()));
+        
         RecurringExpense recurringExpense = new RecurringExpense();
         recurringExpense.setAmount(request.getAmount());
-        recurringExpense.setCategory(request.getCategory());
+        recurringExpense.setCategory(category);
         recurringExpense.setDescription(request.getDescription());
         recurringExpense.setFrequency(request.getFrequency());
         recurringExpense.setStartDate(request.getStartDate());
@@ -73,8 +80,11 @@ public class RecurringExpenseService {
         RecurringExpense recurringExpense = recurringExpenseRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Recurring expense not found with id: " + id));
         
+        Category category = categoryRepository.findById(request.getCategoryId())
+            .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + request.getCategoryId()));
+        
         recurringExpense.setAmount(request.getAmount());
-        recurringExpense.setCategory(request.getCategory());
+        recurringExpense.setCategory(category);
         recurringExpense.setDescription(request.getDescription());
         recurringExpense.setFrequency(request.getFrequency());
         recurringExpense.setStartDate(request.getStartDate());

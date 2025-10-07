@@ -28,9 +28,9 @@ public class RecurringExpense {
     private BigDecimal amount;
     
     @NotNull(message = "Category is required")
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 50)
-    private ExpenseCategory category;
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "category_id", nullable = false)
+    private Category category;
     
     @Column(length = 500)
     private String description;

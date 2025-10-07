@@ -1,7 +1,6 @@
 package com.expensetracker.dto;
 
 import com.expensetracker.model.Expense;
-import com.expensetracker.model.ExpenseCategory;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -16,7 +15,7 @@ import java.time.LocalDateTime;
 public class ExpenseResponse {
     private Long id;
     private BigDecimal amount;
-    private ExpenseCategory category;
+    private String category;
     private LocalDate date;
     private String description;
     private LocalDateTime createdAt;
@@ -26,7 +25,7 @@ public class ExpenseResponse {
         return new ExpenseResponse(
             expense.getId(),
             expense.getAmount(),
-            expense.getCategory(),
+            expense.getCategory().getName(),
             expense.getDate(),
             expense.getDescription(),
             expense.getCreatedAt(),

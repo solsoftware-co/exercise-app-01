@@ -1,6 +1,5 @@
 package com.expensetracker.dto;
 
-import com.expensetracker.model.ExpenseCategory;
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -19,7 +18,7 @@ public class ExpenseRequest {
     private BigDecimal amount;
     
     @NotNull(message = "Category is required")
-    private ExpenseCategory category;
+    private Long categoryId;
     
     @NotNull(message = "Date is required")
     private LocalDate date;
