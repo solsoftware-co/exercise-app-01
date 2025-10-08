@@ -129,8 +129,8 @@ This section outlines the recommended end-to-end process for developing a modern
   - Run security scans (Trivy for containers, OWASP Dependency-Check)
   - Upload test coverage reports
 - Configure CI to run on:
-  - Every push to any branch
-  - Every pull request
+  - Every push to `main`, `develop`, and `feature/**` branches
+  - Every pull request to `main` and `develop`
   - Scheduled runs (daily/weekly for dependency checks)
 - Set branch protection rules:
   - Require CI to pass before merging
@@ -512,11 +512,14 @@ k8s/
 - **DO NOT use Maven Wrapper** in Docker builds - use official `maven:3.9-eclipse-temurin-17` image
 - Copy dependency files first for better layer caching (e.g., `pom.xml`, `package.json`, `package-lock.json`)
 
-## Frontend Specific
+## Frontend Specific (Next.js)
 - **ALWAYS copy `package-lock.json` explicitly** in Dockerfile: `COPY package-lock.json ./`
 - **Use `npm ci --legacy-peer-deps`** instead of `npm install` for reproducible builds
 - Never use conditional logic for package-lock.json - always ensure it exists
 - Ensure `.dockerignore` does NOT exclude `package-lock.json`
+- **CRITICAL: Ensure `public` directory exists before build** - Add `RUN mkdir -p ./public` in builder stage before `npm run build`
+  - Next.js standalone builds fail if public directory doesn't exist when copying in production stage
+  - This prevents "not found" errors during Docker COPY operations
 
 ## Development Workflow
 - **Maintain separate configs** for dev and prod: `Dockerfile` vs `Dockerfile.dev`, `docker-compose.yml` vs `docker-compose.dev.yml`
