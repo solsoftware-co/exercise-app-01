@@ -1,6 +1,5 @@
 package com.expensetracker.repository;
 
-import com.expensetracker.model.Category;
 import com.expensetracker.model.Expense;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
