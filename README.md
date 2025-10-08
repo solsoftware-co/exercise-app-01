@@ -76,7 +76,7 @@ A full-stack personal expense tracking application to help users understand thei
 
 3. **Start the application (Development mode with hot-reload)**
    ```bash
-   docker-compose -f docker-compose.dev.yml up
+   docker-compose -f docker-compose.dev.yml up --build
    ```
 
    This will start:

@@ -4,11 +4,16 @@
 - **Frontend**: Next.js 14, React 18, TypeScript, Tailwind CSS, Shadcn
 - **Database**: PostgreSQL
 - **Testing**: JUnit, Testcontainers (Backend); Jest, React Testing Library (Frontend)
-- **DevOps**: Docker, Docker Compose, Kubernetes
+- **DevOps**: Docker, Docker Compose, Kubernetes, Terraform, Terragrunt
 
 # Development Workflow and Process
 
 This section outlines the recommended end-to-end process for developing a modern, cloud-native, containerized full-stack application from initial concept through production deployment.
+
+**Note:** This guide uses Google Cloud Platform (GCP) services (GKE, GCR, GCS, Cloud SQL, Secret Manager), but the same principles apply to other cloud providers:
+- **AWS**: EKS, ECR, S3, RDS, Secrets Manager
+- **Azure**: AKS, ACR, Blob Storage, Azure SQL, Key Vault
+- **On-Premise**: Self-managed Kubernetes, Harbor/Nexus, MinIO, PostgreSQL, Vault
 
 ## Guiding Principles
 
@@ -27,22 +32,22 @@ This section outlines the recommended end-to-end process for developing a modern
 **Actions**:
 - Initialize Git repository from the start
 - Set up project structure:
-  - [backend/](cci:7://file:///Users/caseyramirez/sol-software/sandbox/exercise-app-02/backend:0:0-0:0) - Spring Boot application
-  - [frontend/](cci:7://file:///Users/caseyramirez/sol-software/sandbox/exercise-app-02/frontend:0:0-0:0) - Next.js application
+  - `backend/` - Spring Boot application
+  - `frontend/` - Next.js application
   - `.github/workflows/` - CI/CD pipelines (even if minimal)
-  - [k8s/](cci:7://file:///Users/caseyramirez/sol-software/sandbox/exercise-app-02/k8s:0:0-0:0) - Kubernetes manifests (create stubs)
-  - [terraform/](cci:7://file:///Users/caseyramirez/sol-software/sandbox/exercise-app-02/terraform:0:0-0:0) - Infrastructure code (create stubs)
-- Create [.gitignore](cci:7://file:///Users/caseyramirez/sol-software/sandbox/exercise-app-02/.gitignore:0:0-0:0) ensuring `.env` files are excluded
-- Create [.env.example](cci:7://file:///Users/caseyramirez/sol-software/sandbox/exercise-app-02/.env.example:0:0-0:0) with all required variables (no actual secrets)
+  - `k8s/` - Kubernetes manifests (create stubs)
+  - `terraform/` - Infrastructure code (create stubs)
+- Create `.gitignore` ensuring `.env` files are excluded
+- Create `.env.example` with all required variables (no actual secrets)
 - Set up linting and code formatting (Prettier, ESLint, Checkstyle)
 - **Initialize basic CI workflow immediately** - even if it just runs linting
 
 **Deliverables**:
-- ✅ Git repository initialized with proper [.gitignore](cci:7://file:///Users/caseyramirez/sol-software/sandbox/exercise-app-02/.gitignore:0:0-0:0)
+- ✅ Git repository initialized with proper `.gitignore`
 - ✅ Project directory structure created
 - ✅ Basic CI workflow (`.github/workflows/ci.yml`) that runs on every commit
 - ✅ README.md with setup instructions
-- ✅ [.env.example](cci:7://file:///Users/caseyramirez/sol-software/sandbox/exercise-app-02/.env.example:0:0-0:0) file committed
+- ✅ `.env.example` file committed
 
 ### 2. Containerization with Docker
 
@@ -57,14 +62,14 @@ This section outlines the recommended end-to-end process for developing a modern
 - Create `Dockerfile.dev` for development with hot-reload
   - Backend: Use Maven image, mount source as volumes, enable Spring DevTools
   - Frontend: Use Node image, mount source as volumes, run `npm run dev` with file watching
-- Create [docker-compose.yml](cci:7://file:///Users/caseyramirez/sol-software/sandbox/exercise-app-02/docker-compose.yml:0:0-0:0) for production-like local testing
-- Create [docker-compose.dev.yml](cci:7://file:///Users/caseyramirez/sol-software/sandbox/exercise-app-02/docker-compose.dev.yml:0:0-0:0) for local development with hot-reload
+- Create `docker-compose.yml` for production-like local testing
+- Create `docker-compose.dev.yml` for local development with hot-reload
 - Create `.dockerignore` files to exclude unnecessary files from Docker context
 - **Update CI workflow** to build Docker images and verify they work
 
 **Deliverables**:
 - ✅ `Dockerfile` and `Dockerfile.dev` for both backend and frontend
-- ✅ [docker-compose.yml](cci:7://file:///Users/caseyramirez/sol-software/sandbox/exercise-app-02/docker-compose.yml:0:0-0:0) and [docker-compose.dev.yml](cci:7://file:///Users/caseyramirez/sol-software/sandbox/exercise-app-02/docker-compose.dev.yml:0:0-0:0)
+- ✅ `docker-compose.yml` and `docker-compose.dev.yml`
 - ✅ `.dockerignore` files
 - ✅ CI builds and tests Docker images
 - ✅ Local development using `docker-compose -f docker-compose.dev.yml up`
@@ -198,7 +203,7 @@ terraform/
 **Objective**: Define application deployment, configuration, and scaling with Kubernetes
 
 **Actions**:
-- Create Kubernetes manifests in [k8s/](cci:7://file:///Users/caseyramirez/sol-software/sandbox/exercise-app-02/k8s:0:0-0:0):
+- Create Kubernetes manifests in `k8s/`:
 
 k8s/ 
 ├── base/ # Base configurations 
@@ -411,75 +416,6 @@ k8s/
   - Use `@DataJpaTest` for testing the persistence layer with an in-memory database like H2.
   - Use Testcontainers for integration tests that require external services like PostgreSQL to ensure production parity.
 
-# Kubernetes (K8s) Best Practices
-
-- **Health Probes**: Always configure `livenessProbe` and `readinessProbe` for your deployments. For Spring Boot, use the `/actuator/health` endpoint.
-- **Configuration**: Use ConfigMaps for non-sensitive configuration and Secrets for sensitive data like database passwords and API keys.
-- **Resource Management**: Define CPU and memory `requests` and `limits` for your containers to ensure stable performance and scheduling.
-
-## Maven Docker Best Practices
-
-- **DO NOT use Maven Wrapper in Docker builds**: The Maven wrapper (`./mvnw`) requires additional wrapper JAR files that can cause build failures
-- **ALWAYS use the official Maven Docker image** for build stages: `maven:3.9-eclipse-temurin-17`
-- **Docker multi-stage build pattern for Maven projects**:
-  ```dockerfile
-  # Stage 1: Build with Maven pre-installed
-  FROM maven:3.9-eclipse-temurin-17 AS build
-  WORKDIR /app
-  
-  # Copy pom.xml first for dependency caching
-  COPY pom.xml .
-  RUN mvn dependency:go-offline -B
-  
-  # Copy source and build
-  COPY src ./src
-  RUN mvn clean package -DskipTests
-  
-  # Stage 2: Runtime with minimal JRE
-  FROM eclipse-temurin:17-jre
-  WORKDIR /app
-  COPY --from=build /app/target/*.jar app.jar
-  ENTRYPOINT ["java", "-jar", "app.jar"]
-  ```
-- This approach avoids Maven wrapper issues and ensures consistent builds across environments
-- Local development can still use `mvn` commands directly (wrapper not needed)
-
-## Development vs Production Docker Configurations
-
-- **ALWAYS maintain separate Docker configurations for development and production environments**
-- **Development Setup** ([docker-compose.dev.yml](cci:7://file:///Users/caseyramirez/sol-software/sandbox/exercise-app-1/docker-compose.dev.yml:0:0-0:0) and [Dockerfile.dev](cci:7://file:///Users/caseyramirez/sol-software/sandbox/exercise-app-1/backend/Dockerfile.dev:0:0-0:0)):
-  - Use volume mounts to enable hot-reload without rebuilding containers
-  - Frontend: Run `npm run dev` with file watching enabled (`WATCHPACK_POLLING=true`)
-  - Backend: Use Spring Boot DevTools with `mvn spring-boot:run` for auto-restart
-  - Mount source directories as volumes (e.g., `./frontend/src:/app/src`, `./backend/src:/app/src`)
-  - Use named volumes for dependencies to persist across restarts (`node_modules`, `.m2`)
-  - Enable polling for file changes in Docker environments
-  
-- **Production Setup** ([docker-compose.yml](cci:7://file:///Users/caseyramirez/sol-software/sandbox/exercise-app-1/docker-compose.yml:0:0-0:0) and [Dockerfile](cci:7://file:///Users/caseyramirez/sol-software/sandbox/exercise-app-1/backend/Dockerfile:0:0-0:0)):
-  - Use multi-stage builds for optimized, minimal images
-  - Build production artifacts (JAR files, Next.js standalone builds)
-  - No volume mounts - everything baked into the image
-  - Use minimal runtime images (e.g., `eclipse-temurin:17-jre` for Java)
-  
-- **Development Dockerfile Pattern**:
-  ```dockerfile
-  # Frontend (Dockerfile.dev)
-  FROM node:20-alpine
-  WORKDIR /app
-  COPY package*.json ./
-  RUN npm ci --legacy-peer-deps
-  ENV WATCHPACK_POLLING=true
-  CMD ["npm", "run", "dev"]
-  
-  # Backend (Dockerfile.dev)
-  FROM maven:3.9-eclipse-temurin-17
-  WORKDIR /app
-  COPY pom.xml .
-  RUN mvn dependency:go-offline -B
-  ENV SPRING_DEVTOOLS_RESTART_ENABLED=true
-  CMD ["mvn", "spring-boot:run"]
-
-
 # Security Best Practices
 
 ## Environment Variables and Secrets
@@ -536,6 +472,27 @@ k8s/
   // ❌ BAD: Race condition - state can be inconsistent during reload
   await api.updateItem(id, data);
   await loadItems(); // Causes re-render with potentially undefined state
+  ```
+
+- **Pattern to use**:
+  ```typescript
+  // ✅ GOOD: Optimistic update with functional state
+  const handleUpdate = async (id: string, data: UpdateData) => {
+    // Optimistically update UI
+    setItems((current) => 
+      current.map((item) => item.id === id ? { ...item, ...data } : item)
+    );
+    
+    try {
+      await api.updateItem(id, data);
+      toast.success('Updated successfully');
+    } catch (error) {
+      // Revert on error
+      await loadItems();
+      toast.error('Update failed');
+    }
+  };
+  ```
 
 ## TypeScript with React
 - Use type imports for React types: `type ReactNode`, `type HTMLAttributes`
@@ -547,123 +504,36 @@ k8s/
 - All client-side interactive components must be marked with `"use client"`
 - Server components should NOT have `"use client"` directive
 
-## Docker Best Practices
-- **Use multi-stage builds for compiled applications (Java/Spring Boot)** to keep the final image small. The first stage builds the application artifact (e.g., JAR file), and the second stage copies only the artifact into a minimal runtime image.
-- **Standardize on `eclipse-temurin:17-jre`** for the final runtime stage in Java/Spring Boot Dockerfiles to ensure consistency.
+# Docker Best Practices Summary
+
+## Production Builds
+- **Use multi-stage builds** for compiled applications (Java/Spring Boot, Node.js)
+- **Standardize on minimal runtime images**: `eclipse-temurin:17-jre` for Java, `node:20-alpine` for Node
+- **DO NOT use Maven Wrapper** in Docker builds - use official `maven:3.9-eclipse-temurin-17` image
+- Copy dependency files first for better layer caching (e.g., `pom.xml`, `package.json`, `package-lock.json`)
+
+## Frontend Specific
 - **ALWAYS copy `package-lock.json` explicitly** in Dockerfile: `COPY package-lock.json ./`
-- **Use `npm ci` instead of `npm install`** for reproducible builds in Docker
-- Add `--legacy-peer-deps` flag if peer dependency conflicts occur: `RUN npm ci --legacy-peer-deps`
-- Never use conditional logic for package-lock.json in Dockerfile - always ensure it exists
+- **Use `npm ci --legacy-peer-deps`** instead of `npm install` for reproducible builds
+- Never use conditional logic for package-lock.json - always ensure it exists
 - Ensure `.dockerignore` does NOT exclude `package-lock.json`
-- Multi-stage builds should copy `package.json` and `package-lock.json` separately for better caching
 
-## Common Docker Build Issues
-1. **Missing package-lock.json**: Always commit `package-lock.json` to version control
-2. **Peer dependency conflicts**: Use `--legacy-peer-deps` flag with npm ci
-3. **Cache invalidation**: Copy package files before other source files to leverage Docker layer caching
+## Development Workflow
+- **Maintain separate configs** for dev and prod: `Dockerfile` vs `Dockerfile.dev`, `docker-compose.yml` vs `docker-compose.dev.yml`
+- Use volume mounts in dev for hot-reload: `./src:/app/src`
+- Enable file watching in Docker: `WATCHPACK_POLLING=true` for frontend, Spring DevTools for backend
+- Use named volumes for dependencies to persist across restarts: `node_modules`, `.m2`
 
+## Common Issues
+- **Missing package-lock.json**: Always commit to version control
+- **Peer dependency conflicts**: Use `--legacy-peer-deps` flag with npm ci
+- **Cache invalidation**: Copy package files before source files to leverage Docker layer caching
 
-# Deployment and Infrastructure Strategy
-
-## Orchestration
-- **ALL applications must be deployed and managed via Kubernetes (K8s)**
-- Container orchestration is the standard for all services
-- Use K8s manifests for defining deployments, services, ingress, configmaps, secrets, etc.
-- Follow K8s best practices: health probes, resource limits, HPA, etc.
-
-## CI/CD Pipeline
-- **GitHub Actions** is the standard for all CI/CD workflows
-- Implement separate workflows for:
-  - **CI**: Build, test, and validate on pull requests
-  - **CD - Staging**: Deploy to staging environment on merge to `develop` branch
-  - **CD - Production**: Deploy to production on merge to `main` branch or version tags
-- Build Docker images and push to Google Container Registry (GCR)
-- Use GitHub environments for staging and production with appropriate protection rules
-- Implement automated rollout status checks and health verifications
-
-## Infrastructure as Code (IaC)
-- **Terraform** is the standard for managing all cloud infrastructure
-- Store Terraform state in GCS (Google Cloud Storage) with state locking
-- Infrastructure changes are triggered via GitHub Actions workflows
-- Separate Terraform configurations for different environments (staging, production)
-- Version control all Terraform files
-- Use Terraform modules for reusable infrastructure components
-- Infrastructure changes require pull request reviews before applying
-
-## Secrets Management
-- **Google Cloud Secret Manager** is the standard for storing all secrets
-- NEVER commit secrets to Git repositories
-- Use External Secrets Operator in Kubernetes to sync secrets from GCP Secret Manager
-- Local development uses `.env` files (never committed, only `.env.example`)
-- Rotate secrets regularly and follow the principle of least privilege
-- Reference secrets in Kubernetes using ExternalSecret resources
-
-## Project Structure for Deployments
-
-```
-project/
-├── .github/
-│   └── workflows/
-│       ├── ci.yml                    # Build and test
-│       ├── cd-staging.yml            # Deploy to staging
-│       ├── cd-production.yml         # Deploy to production
-│       └── terraform-apply.yml       # Apply infrastructure changes
-├── terraform/
-│   ├── environments/
-│   │   ├── staging/
-│   │   └── production/
-│   ├── modules/
-│   └── backend.tf                    # Terraform state config
-├── k8s/
-│   ├── base/                         # Base K8s manifests
-│   ├── overlays/
-│   │   ├── staging/
-│   │   └── production/
-│   └── kustomization.yaml
-└── ...application code...
-```
-
-## Required GitHub Secrets
-
-For all projects, configure these GitHub secrets:
-- `GCP_PROJECT_ID` - Google Cloud project ID
-- `GCP_SA_KEY` - Service account JSON key with appropriate permissions
-- `GKE_CLUSTER_STAGING` - Staging cluster name
-- `GKE_CLUSTER_PRODUCTION` - Production cluster name
-- `GKE_REGION` - GKE cluster region
-- `TF_STATE_BUCKET` - GCS bucket for Terraform state
-
-## Deployment Workflow
-
-1. **Development**: Work on feature branches, test locally with Docker Compose
-2. **Pull Request**: Create PR, CI workflow runs tests and builds
-3. **Merge to develop**: Automatically deploys to staging via CD workflow
-4. **Merge to main**: Automatically deploys to production via CD workflow
-5. **Infrastructure Changes**: Terraform changes are reviewed and applied via workflow
-6. **Rollback**: Use `kubectl rollout undo` or redeploy previous version
-
-## GCP Services Used
-
-- **Google Kubernetes Engine (GKE)**: Container orchestration
-- **Google Container Registry (GCR)**: Docker image storage
-- **Google Cloud Secret Manager**: Secrets storage
-- **Google Cloud Storage (GCS)**: Terraform state backend
-- **Google Cloud SQL** (if applicable): Managed databases
-- **Google Cloud Load Balancer**: Ingress traffic management
-
-## Monitoring and Observability
-
-- Use GCP Cloud Monitoring for infrastructure metrics
-- Configure K8s liveness and readiness probes for all services
-- Implement structured logging with appropriate log levels
-- Use Spring Boot Actuator endpoints for health checks and metrics
-- Set up alerts for critical failures and resource exhaustion
-
-## Best Practices Checklist
+# Best Practices Checklist
 
 When creating a new project or service:
 - [ ] Kubernetes manifests created in `k8s/` directory
-- [ ] GitHub Actions workflows for CI/CD in `.github/workflows/`
+- [ ] GitHub Actions workflows for CI in `.github/workflows/`
 - [ ] Terraform configurations for infrastructure in `terraform/`
 - [ ] External Secrets configured to pull from GCP Secret Manager
 - [ ] Health probes and resource limits defined in K8s deployments
