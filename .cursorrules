@@ -106,11 +106,22 @@ This section outlines the recommended end-to-end process for developing a modern
 - Test behavior, not implementation details
 - Keep tests fast and deterministic
 
+**Code Coverage Requirements**:
+- **Backend (Java/Spring Boot)**: Minimum 80% line coverage, 70% branch coverage
+  - Enforced via JaCoCo Maven plugin
+  - CI pipeline fails if coverage thresholds not met
+- **Frontend (React/Next.js)**: Minimum 80% lines, 70% branches, 75% functions, 80% statements
+  - Enforced via Jest coverage thresholds
+  - CI pipeline fails if coverage thresholds not met
+- Coverage reports uploaded as artifacts in GitHub Actions
+- Focus on meaningful tests over arbitrary coverage numbers
+
 **Deliverables**:
 - ✅ Test frameworks configured for backend and frontend
 - ✅ Tests run automatically in CI on every commit
 - ✅ Test coverage reports generated
 - ✅ Integration tests use Testcontainers for production parity
+- ✅ Code coverage thresholds enforced in CI pipeline
 
 ### 4. Continuous Integration (CI) Pipeline
 
