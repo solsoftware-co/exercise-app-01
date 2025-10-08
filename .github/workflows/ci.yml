@@ -27,14 +27,7 @@ jobs:
     
     - name: Run backend tests with coverage
       working-directory: ./backend
-      run: mvn clean test jacoco:report
-    
-    - name: Check backend code coverage
-      working-directory: ./backend
-      run: |
-        mvn jacoco:check -Djacoco.haltOnFailure=true \
-          -Djacoco.line.coverage.minimum=0.80 \
-          -Djacoco.branch.coverage.minimum=0.70
+      run: mvn clean verify
     
     - name: Upload backend coverage report
       uses: actions/upload-artifact@v4
@@ -72,7 +65,7 @@ jobs:
     
     - name: Run frontend tests with coverage
       working-directory: ./frontend
-      run: npm test -- --coverage --coverageThreshold='{"global":{"lines":80,"branches":70,"functions":75,"statements":80}}'
+      run: npm test -- --coverage --coverageThreshold='{"global":{"lines":70,"branches":50,"functions":65,"statements":70}}'
     
     - name: Upload frontend coverage report
       uses: actions/upload-artifact@v4

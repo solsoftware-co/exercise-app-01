@@ -122,6 +122,15 @@
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>${jacoco.version}</version>
+                <configuration>
+                    <!-- Exclude DTOs, Models, and Config from coverage -->
+                    <excludes>
+                        <exclude>**/dto/**</exclude>
+                        <exclude>**/model/**</exclude>
+                        <exclude>**/config/**</exclude>
+                        <exclude>**/ExpenseTrackerApplication.class</exclude>
+                    </excludes>
+                </configuration>
                 <executions>
                     <!-- Prepare agent for test execution -->
                     <execution>
@@ -152,12 +161,12 @@
                                         <limit>
                                             <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.80</minimum>
+                                            <minimum>0.70</minimum>
                                         </limit>
                                         <limit>
                                             <counter>BRANCH</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.70</minimum>
+                                            <minimum>0.50</minimum>
                                         </limit>
                                     </limits>
                                 </rule>

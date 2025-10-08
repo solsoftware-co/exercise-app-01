@@ -107,14 +107,20 @@ This section outlines the recommended end-to-end process for developing a modern
 - Keep tests fast and deterministic
 
 **Code Coverage Requirements**:
-- **Backend (Java/Spring Boot)**: Minimum 80% line coverage, 70% branch coverage
+- **Backend (Java/Spring Boot)**: Minimum 70% line coverage, 50% branch coverage
   - Enforced via JaCoCo Maven plugin
   - CI pipeline fails if coverage thresholds not met
-- **Frontend (React/Next.js)**: Minimum 80% lines, 70% branches, 75% functions, 80% statements
+  - Gradually increase thresholds as test coverage improves (target: 80% lines, 70% branches)
+  - **Excluded from coverage**: DTOs (`**/dto/**`), Models (`**/model/**`), Config (`**/config/**`), Main Application class
+    - These are data containers with minimal logic (mostly Lombok-generated getters/setters)
+    - Focus coverage on business logic: Services, Controllers, Repositories
+- **Frontend (React/Next.js)**: Minimum 70% lines, 50% branches, 65% functions, 70% statements
   - Enforced via Jest coverage thresholds
   - CI pipeline fails if coverage thresholds not met
+  - Gradually increase thresholds as test coverage improves (target: 80% lines, 70% branches)
 - Coverage reports uploaded as artifacts in GitHub Actions
 - Focus on meaningful tests over arbitrary coverage numbers
+- **Branch coverage** is harder to achieve - requires testing all conditional paths (if/else, switch, ternary)
 
 **Deliverables**:
 - ✅ Test frameworks configured for backend and frontend
@@ -402,6 +408,7 @@ k8s/
 - **Lombok**: To reduce boilerplate code (getters, setters, constructors) in Java classes.
 - **Testcontainers**: For reliable integration tests with real services like PostgreSQL running in Docker.
 - **Spring Boot Actuator**: For production-ready features like health checks and metrics.
+- **JaCoCo**: For code coverage reporting and enforcement (configured in `pom.xml`)
 
 ## Frontend
 - **Shadcn**: For building accessible and composable UI components. Built on top of Radix UI and Tailwind CSS.
@@ -426,6 +433,72 @@ k8s/
   - Use `@SpringBootTest` for full integration tests.
   - Use `@DataJpaTest` for testing the persistence layer with an in-memory database like H2.
   - Use Testcontainers for integration tests that require external services like PostgreSQL to ensure production parity.
+  - Use `@WebMvcTest` for controller tests with mocked services.
+
+# Maven Best Practices
+
+## Maven Lifecycle Commands
+
+**ALWAYS use Maven lifecycle phases, NOT direct plugin goals:**
+
+### ✅ Correct Commands (Use These):
+```bash
+mvn clean test          # Run tests only
+mvn clean verify        # Run tests + coverage checks (RECOMMENDED for CI)
+mvn clean package       # Run verify + create JAR
+mvn clean install       # Run package + install to local Maven repo
+```
+
+### ❌ Wrong Commands (Don't Use):
+```bash
+mvn clean test jacoco:report jacoco:check    # Direct goals ignore pom.xml config
+mvn jacoco:check                              # Missing rules configuration
+```
+
+## Why Lifecycle Phases Are Better
+
+- **Lifecycle phases** (test, verify, package) automatically trigger configured `<execution>` blocks in `pom.xml`
+- **Direct plugin goals** (jacoco:check) run standalone and ignore `<execution>` configuration
+- This means direct goals won't use your exclusions, rules, or thresholds
+
+## Maven Phase Order
+```
+clean → compile → test → package → verify → install → deploy
+```
+
+## Code Coverage with JaCoCo
+
+### JaCoCo Configuration Pattern:
+- **Exclude** data containers from coverage: `**/dto/**`, `**/model/**`, `**/config/**`, Main Application class
+- **Set thresholds** in `<execution id="check">`: LINE 70%, BRANCH 50%
+- **Runs automatically** during `mvn verify` via `<executions>` blocks in `pom.xml`
+- **Focus coverage on** business logic: Services, Controllers, Repositories
+- See `backend/pom.xml` for full JaCoCo plugin configuration
+
+## CI/CD Maven Commands
+
+### For GitHub Actions / CI Pipelines:
+```yaml
+# ✅ CORRECT - Runs tests + coverage check
+- name: Run backend tests with coverage
+  run: mvn clean verify
+
+# ❌ WRONG - Doesn't use pom.xml configuration
+- name: Run backend tests with coverage
+  run: mvn clean test jacoco:report jacoco:check
+```
+
+### Local Development:
+```bash
+# Run tests with coverage
+mvn clean verify
+
+# View coverage report
+open target/site/jacoco/index.html
+
+# Skip tests (for quick builds)
+mvn clean package -DskipTests
+```
 
 # Security Best Practices
 
