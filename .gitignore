@@ -42,10 +42,18 @@ coverage/
 
 # Terraform
 terraform/.terraform/
+terraform/**/.terraform/
 terraform/*.tfstate
+terraform/**/*.tfstate
 terraform/*.tfstate.backup
+terraform/**/*.tfstate.backup
 terraform/.terraform.lock.hcl
+terraform/**/.terraform.lock.hcl
 terraform/terraform.tfvars
+terraform/**/terraform.tfvars
+terraform/**/.terragrunt-cache/
+**/backend_override.tf
+**/provider_override.tf
 
 # Kubernetes secrets (only examples should be committed)
 k8s/**/secrets.yaml

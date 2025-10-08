@@ -227,12 +227,331 @@ terraform/
 - Easier to scale to multiple projects/teams
 
 **Deliverables**:
-- ✅ Terraform modules for all infrastructure components
+- ✅ Terraform modules for all infrastructure components (GKE, Cloud SQL, VPC, Secret Manager)
 - ✅ Terragrunt configurations for staging and production
 - ✅ Remote state backend configured (GCS)
-- ✅ GitHub workflows for Terraform plan and apply
-- ✅ Staging environment infrastructure provisioned
-- ✅ Production environment infrastructure provisioned
+- ✅ `.github/workflows/terraform-plan.yml` for PR validation
+- ✅ `.github/workflows/terraform-apply.yml` for automated deployment
+- ✅ `terraform/setup.sh` automated setup script
+- ✅ `INFRASTRUCTURE.md` quick start guide
+- ✅ `NETWORKING.md` comprehensive networking guide
+- ✅ `TERRAGRUNT_EXPLAINED.md` Terragrunt concepts explained
+- ✅ `GITHUB_WORKFLOWS_EXPLAINED.md` CI/CD workflows explained
+- ✅ Environment-specific configs: staging (preemptible, small), production (standard, HA)
+- ✅ Infrastructure provisioned and running
+
+## Terraform & Terragrunt Best Practices
+
+### Common Pitfalls & Solutions (Lessons Learned)
+
+#### **1. GKE Cluster Configuration Issues**
+
+**❌ WRONG - Deprecated/Invalid Configurations:**
+```hcl
+# Don't use these - they cause "invalid argument" errors
+resource "google_container_cluster" "primary" {
+  # ❌ network_policy block is deprecated
+  network_policy {
+    enabled = true
+  }
+  
+  # ❌ Invalid CIDR notation
+  ip_allocation_policy {
+    cluster_ipv4_cidr_block  = "/16"  # Missing IP prefix!
+    services_ipv4_cidr_block = "/22"
+  }
+  
+  # ❌ managed_prometheus can cause issues
+  monitoring_config {
+    managed_prometheus {
+      enabled = true
+    }
+  }
+}
+```
+
+**✅ CORRECT - Use Secondary Ranges:**
+```hcl
+resource "google_container_cluster" "primary" {
+  # ✅ Use secondary ranges from subnet
+  ip_allocation_policy {
+    cluster_secondary_range_name  = "pods"
+    services_secondary_range_name = "services"
+  }
+  
+  # ✅ Simple monitoring config
+  monitoring_config {
+    enable_components = ["SYSTEM_COMPONENTS", "WORKLOADS"]
+  }
+  
+  # ✅ No network_policy block needed (Dataplane V2 handles it)
+}
+```
+
+#### **2. Cloud SQL Private IP Requires VPC Peering**
+
+**❌ WRONG - Missing VPC Peering:**
+```hcl
+# This will fail with "network doesn't have private services connection"
+resource "google_sql_database_instance" "postgres" {
+  settings {
+    ip_configuration {
+      ipv4_enabled    = false
+      private_network = google_compute_network.vpc.id
+    }
+  }
+}
+```
+
+**✅ CORRECT - Add VPC Peering First:**
+```hcl
+# Step 1: Reserve IP range for Google services
+resource "google_compute_global_address" "private_ip_address" {
+  name          = "${var.cluster_name}-private-ip"
+  purpose       = "VPC_PEERING"
+  address_type  = "INTERNAL"
+  prefix_length = 16
+  network       = google_compute_network.vpc.id
+}
+
+# Step 2: Create VPC peering connection
+resource "google_service_networking_connection" "private_vpc_connection" {
+  network                 = google_compute_network.vpc.id
+  service                 = "servicenetworking.googleapis.com"
+  reserved_peering_ranges = [google_compute_global_address.private_ip_address.name]
+}
+
+# Step 3: Cloud SQL with dependency
+resource "google_sql_database_instance" "postgres" {
+  depends_on = [google_service_networking_connection.private_vpc_connection]
+  
+  settings {
+    ip_configuration {
+      ipv4_enabled    = false
+      private_network = google_compute_network.vpc.id
+    }
+  }
+}
+```
+
+#### **3. Secret Manager Replication Syntax**
+
+**❌ WRONG - Old Syntax:**
+```hcl
+resource "google_secret_manager_secret" "db_password" {
+  replication {
+    automatic = true  # ❌ Invalid argument error
+  }
+}
+```
+
+**✅ CORRECT - New Syntax:**
+```hcl
+resource "google_secret_manager_secret" "db_password" {
+  replication {
+    auto {}  # ✅ Correct syntax
+  }
+}
+```
+
+#### **4. Required GCP APIs Must Be Enabled**
+
+**Before running Terraform, enable these APIs:**
+```bash
+gcloud services enable \
+  container.googleapis.com \
+  compute.googleapis.com \
+  sqladmin.googleapis.com \
+  secretmanager.googleapis.com \
+  cloudresourcemanager.googleapis.com \
+  servicenetworking.googleapis.com
+```
+
+**Why:** Terraform will fail if it tries to create resources using disabled APIs.
+
+#### **5. Subnet Secondary Ranges for GKE**
+
+**❌ WRONG - Missing Secondary Ranges:**
+```hcl
+resource "google_compute_subnetwork" "subnet" {
+  ip_cidr_range = "10.0.0.0/24"
+  # ❌ No secondary ranges - GKE will fail
+}
+```
+
+**✅ CORRECT - Define Secondary Ranges:**
+```hcl
+resource "google_compute_subnetwork" "subnet" {
+  ip_cidr_range = "10.0.0.0/24"
+  
+  # ✅ Secondary range for pods
+  secondary_ip_range {
+    range_name    = "pods"
+    ip_cidr_range = "10.1.0.0/16"
+  }
+  
+  # ✅ Secondary range for services
+  secondary_ip_range {
+    range_name    = "services"
+    ip_cidr_range = "10.2.0.0/22"
+  }
+}
+```
+
+### Terraform State Management
+
+**Critical Rules:**
+1. **NEVER commit `terraform.tfstate`** to Git (contains sensitive data)
+2. **ALWAYS use remote state** (GCS bucket with versioning)
+3. **NEVER run `terraform apply` locally in production** - use CI/CD
+4. **Lock state during operations** - Terraform does this automatically with GCS backend
+
+**State Backend Configuration:**
+```hcl
+# terragrunt.hcl
+remote_state {
+  backend = "gcs"
+  config = {
+    bucket   = "expense-tracker-terraform-state-${get_env("GCP_PROJECT_ID")}"
+    prefix   = "${path_relative_to_include()}/terraform.tfstate"
+    project  = get_env("GCP_PROJECT_ID")
+  }
+}
+```
+
+### Terragrunt Best Practices
+
+**✅ DO:**
+- Use `terragrunt.hcl` for DRY configuration
+- Keep environment-specific values in `environments/{env}/terragrunt.hcl`
+- Use `get_env()` for project-specific variables
+- Generate backend and provider configs automatically
+
+**❌ DON'T:**
+- Hardcode project IDs in Terraform files
+- Duplicate infrastructure code across environments
+- Commit `terraform.tfvars` with sensitive data
+- Use `terraform` directly when you have Terragrunt (use `terragrunt` commands)
+
+### IP Address Planning
+
+**Plan your IP ranges to avoid conflicts:**
+
+```
+VPC: 10.0.0.0/16 (65,536 IPs total)
+├── Primary Subnet: 10.0.0.0/24 (256 IPs for nodes)
+├── Pods Range: 10.1.0.0/16 (65,536 IPs for pods)
+├── Services Range: 10.2.0.0/22 (1,024 IPs for services)
+└── Google Services: 10.20.0.0/16 (65,536 IPs for Cloud SQL, etc.)
+```
+
+**Rules:**
+- Use `/24` for small networks (256 IPs)
+- Use `/16` for large networks (65,536 IPs)
+- Don't overlap ranges
+- Document your IP allocations
+
+### Cost Optimization for Learning
+
+**For learning/demo projects:**
+```hcl
+# Staging environment
+inputs = {
+  node_count     = 1              # Single node
+  machine_type   = "e2-small"     # Smallest type
+  min_node_count = 1
+  max_node_count = 2              # Low max
+}
+
+# Use preemptible nodes (80% cheaper)
+node_config {
+  preemptible = var.environment == "staging" ? true : false
+}
+
+# Use smallest database tier
+settings {
+  tier = var.environment == "staging" ? "db-f1-micro" : "db-custom-2-4096"
+}
+```
+
+**Stop cluster when not using:**
+```bash
+gcloud container clusters resize CLUSTER_NAME --num-nodes=0
+```
+
+### Debugging Terraform Errors
+
+**Common error patterns:**
+
+1. **"Request contains an invalid argument"**
+   - Check for deprecated configurations
+   - Verify CIDR notation is correct
+   - Remove unsupported features
+
+2. **"Network doesn't have private services connection"**
+   - Add VPC peering resources
+   - Ensure `depends_on` is set correctly
+
+3. **"API not enabled"**
+   - Run `gcloud services enable <api>`
+   - Wait 1-2 minutes for API to activate
+
+4. **"State lock"**
+   - Another operation is running
+   - Wait for it to complete
+   - Or force unlock: `terragrunt force-unlock LOCK_ID`
+
+### Security Best Practices
+
+1. **Use Workload Identity** for GKE pod authentication (no service account keys)
+2. **Private IPs only** for databases (no public exposure)
+3. **Secret Manager** for passwords and API keys
+4. **IAM least privilege** - grant minimum necessary permissions
+5. **Deletion protection** for production resources
+
+### Documentation Requirements
+
+**Every Terraform project should have:**
+- ✅ `README.md` - Setup instructions
+- ✅ `NETWORKING.md` - IP ranges and architecture
+- ✅ `TERRAGRUNT_EXPLAINED.md` - How Terragrunt works
+- ✅ `GITHUB_WORKFLOWS_EXPLAINED.md` - CI/CD process
+- ✅ `.env.example` or `terraform.tfvars.example` - Required variables
+- ✅ Architecture diagrams (ASCII or images)
+
+### Pre-Deployment Checklist
+
+Before running `terragrunt apply`:
+
+- [ ] GCP project created
+- [ ] Billing enabled
+- [ ] Required APIs enabled
+- [ ] GCS bucket for state created
+- [ ] `GCP_PROJECT_ID` environment variable set
+- [ ] Authenticated with `gcloud auth application-default login`
+- [ ] Reviewed `terragrunt plan` output
+- [ ] IP ranges don't overlap
+- [ ] Cost estimate acceptable
+
+### Post-Deployment Verification
+
+After `terragrunt apply` succeeds:
+
+```bash
+# Verify GKE cluster
+gcloud container clusters list
+kubectl get nodes
+
+# Verify Cloud SQL
+gcloud sql instances list
+
+# Verify networking
+gcloud compute networks list
+gcloud compute networks subnets list
+
+# Check outputs
+terragrunt output
+```
 
 ### 6. Kubernetes (K8s) Configuration
 

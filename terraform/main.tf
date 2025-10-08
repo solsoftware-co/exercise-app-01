@@ -17,15 +17,10 @@ resource "google_container_cluster" "primary" {
     workload_pool = "${var.project_id}.svc.id.goog"
   }
   
-  # Enable network policy
-  network_policy {
-    enabled = true
-  }
-  
-  # Enable IP aliasing
+  # Enable IP aliasing - use secondary ranges from subnet
   ip_allocation_policy {
-    cluster_ipv4_cidr_block  = "/16"
-    services_ipv4_cidr_block = "/22"
+    cluster_secondary_range_name  = "pods"
+    services_secondary_range_name = "services"
   }
   
   # Maintenance window
@@ -33,18 +28,6 @@ resource "google_container_cluster" "primary" {
     daily_maintenance_window {
       start_time = "03:00"
     }
-  }
-  
-  # Monitoring and logging
-  monitoring_config {
-    enable_components = ["SYSTEM_COMPONENTS", "WORKLOADS"]
-    managed_prometheus {
-      enabled = true
-    }
-  }
-  
-  logging_config {
-    enable_components = ["SYSTEM_COMPONENTS", "WORKLOADS"]
   }
 }
 
@@ -140,11 +123,28 @@ resource "google_compute_global_address" "ingress_ip" {
   name = "${var.cluster_name}-ingress-ip"
 }
 
+# Private VPC Connection for Cloud SQL
+resource "google_compute_global_address" "private_ip_address" {
+  name          = "${var.cluster_name}-private-ip"
+  purpose       = "VPC_PEERING"
+  address_type  = "INTERNAL"
+  prefix_length = 16
+  network       = google_compute_network.vpc.id
+}
+
+resource "google_service_networking_connection" "private_vpc_connection" {
+  network                 = google_compute_network.vpc.id
+  service                 = "servicenetworking.googleapis.com"
+  reserved_peering_ranges = [google_compute_global_address.private_ip_address.name]
+}
+
 # Cloud SQL Instance (Optional - for managed PostgreSQL)
 resource "google_sql_database_instance" "postgres" {
   name             = "${var.cluster_name}-postgres"
   database_version = "POSTGRES_15"
   region           = var.region
+  
+  depends_on = [google_service_networking_connection.private_vpc_connection]
   
   settings {
     tier = var.environment == "staging" ? "db-f1-micro" : "db-custom-2-4096"
@@ -193,7 +193,7 @@ resource "google_secret_manager_secret" "db_password" {
   secret_id = "${var.cluster_name}-db-password"
   
   replication {
-    automatic = true
+    auto {}
   }
 }
 
