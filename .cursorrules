@@ -67,6 +67,153 @@ This section outlines the recommended end-to-end process for developing a modern
 - Create `.dockerignore` files to exclude unnecessary files from Docker context
 - **Update CI workflow** to build Docker images and verify they work
 
+## Docker Multi-Architecture Builds (CRITICAL)
+
+**⚠️ ALWAYS build Docker images for the target platform architecture!**
+
+### The Problem: Architecture Mismatch
+
+**Common Error:**
+```
+exec /opt/java/openjdk/bin/java: exec format error
+```
+
+**Cause:** Image built for ARM64 (Apple Silicon Mac) but deployed to AMD64 (GKE/cloud servers)
+
+### Solution: Use `--platform` Flag
+
+**❌ WRONG - Builds for host architecture (ARM64 on Apple Silicon):**
+```bash
+docker build -t myimage:latest .
+```
+
+**✅ CORRECT - Explicitly specify target platform:**
+```bash
+# For cloud deployments (GKE, EKS, AKS, most VPS)
+docker build --platform linux/amd64 -t myimage:latest .
+
+# For Apple Silicon Macs (local development)
+docker build --platform linux/arm64 -t myimage:latest .
+```
+
+### Default Architecture by Platform
+
+| Platform | Default Architecture | Notes |
+|----------|---------------------|-------|
+| **GKE (Google Kubernetes Engine)** | `linux/amd64` | Standard x86_64 nodes |
+| **EKS (AWS)** | `linux/amd64` | Most EC2 instances |
+| **AKS (Azure)** | `linux/amd64` | Standard VMs |
+| **Apple Silicon Mac (M1/M2/M3)** | `linux/arm64` | Local development |
+| **Intel Mac** | `linux/amd64` | Local development |
+| **Most Cloud VPS** | `linux/amd64` | DigitalOcean, Linode, etc. |
+
+### Best Practices
+
+**1. Specify Platform in Dockerfile (Recommended):**
+
+**✅ CORRECT - Platform in Dockerfile:**
+```dockerfile
+# Multi-stage build with platform specified
+FROM --platform=linux/amd64 maven:3.9-eclipse-temurin-17 AS build
+WORKDIR /app
+COPY pom.xml .
+RUN mvn dependency:go-offline -B
+COPY src ./src
+RUN mvn clean package -DskipTests
+
+FROM --platform=linux/amd64 eclipse-temurin:17-jre
+WORKDIR /app
+COPY --from=build /app/target/*.jar app.jar
+ENTRYPOINT ["java", "-jar", "app.jar"]
+```
+
+**Then build normally:**
+```bash
+# No --platform flag needed!
+docker build -t us-central1-docker.pkg.dev/PROJECT_ID/REPO/backend:TAG .
+```
+
+**Why this is better:**
+- ✅ No need to remember `--platform` flag
+- ✅ Consistent across all developers
+- ✅ Works automatically in CI/CD
+- ✅ Self-documenting (Dockerfile shows target platform)
+
+---
+
+**2. Alternative: Platform in Build Command (Less Recommended):**
+
+If you can't modify the Dockerfile, use the flag:
+```bash
+docker build --platform linux/amd64 -t myimage:latest .
+```
+
+**Downside:** Easy to forget, inconsistent builds.
+
+---
+
+**3. Multi-Architecture Builds (Advanced):**
+```bash
+# Build for both AMD64 and ARM64
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t myimage:latest --push .
+```
+
+---
+
+**4. CI/CD Pipelines:**
+```yaml
+# GitHub Actions example (platform in Dockerfile)
+- name: Build Docker image
+  run: |
+    docker build -t $IMAGE_NAME:$TAG .
+```
+
+---
+
+**5. Verify Image Architecture:**
+```bash
+# Check what architecture an image was built for
+docker image inspect IMAGE_NAME:TAG | grep Architecture
+
+# Should show: "Architecture": "amd64"
+```
+
+### Why This Matters
+
+- **Performance**: Running ARM64 images on AMD64 (or vice versa) requires emulation (slow)
+- **Compatibility**: Some images won't run at all (exec format error)
+- **Production Parity**: Dev environment should match production architecture
+
+### Quick Reference
+
+**Recommended Approach (Platform in Dockerfile):**
+```dockerfile
+# In your Dockerfile
+FROM --platform=linux/amd64 maven:3.9-eclipse-temurin-17 AS build
+FROM --platform=linux/amd64 eclipse-temurin:17-jre
+```
+
+```bash
+# Then build normally
+docker build -t IMAGE .  # ✅ Always builds AMD64
+```
+
+**Alternative Approach (Platform in Command):**
+```bash
+# ✅ Building for cloud deployment (from any machine)
+docker build --platform linux/amd64 -t IMAGE .
+
+# ✅ Building for local Apple Silicon
+docker build --platform linux/arm64 -t IMAGE .
+
+# ✅ Building for both (requires buildx)
+docker buildx build --platform linux/amd64,linux/arm64 -t IMAGE .
+
+# ❌ NEVER do this for cloud deployments from Apple Silicon
+docker build -t IMAGE .  # Builds ARM64, will fail on AMD64 servers
+```
+
 **Deliverables**:
 - ✅ `Dockerfile` and `Dockerfile.dev` for both backend and frontend
 - ✅ `docker-compose.yml` and `docker-compose.dev.yml`
@@ -509,6 +656,36 @@ gcloud container clusters resize CLUSTER_NAME --num-nodes=0
 4. **IAM least privilege** - grant minimum necessary permissions
 5. **Deletion protection** for production resources
 
+### GKE Service Account IAM Roles (CRITICAL)
+
+**ALWAYS include these IAM roles for GKE service accounts:**
+
+```hcl
+resource "google_project_iam_member" "gke_sa_roles" {
+  for_each = toset([
+    "roles/logging.logWriter",              # Required for logging
+    "roles/monitoring.metricWriter",        # Required for metrics
+    "roles/monitoring.viewer",              # Required for monitoring
+    "roles/stackdriver.resourceMetadata.writer",  # Required for Stackdriver
+    "roles/artifactregistry.reader",        # ⚠️ REQUIRED to pull images from Artifact Registry
+    # "roles/storage.objectViewer",         # Only if using GCR (deprecated)
+  ])
+  
+  project = var.project_id
+  role    = each.value
+  member  = "serviceAccount:${google_service_account.gke_sa.email}"
+}
+```
+
+**Why `roles/artifactregistry.reader` is critical:**
+- Without this role, GKE nodes **cannot pull Docker images** from Artifact Registry
+- Pods will fail with `ImagePullBackOff` and `403 Forbidden` errors
+- This is a common mistake when migrating from GCR to Artifact Registry
+
+**For GCR (deprecated):**
+- Use `roles/storage.objectViewer` instead
+- But prefer Artifact Registry for new projects
+
 ### Documentation Requirements
 
 **Every Terraform project should have:**
@@ -582,6 +759,96 @@ k8s/
 └── ingress.yaml
 
 - **Use Kustomize** for environment-specific configurations
+
+## Kustomize Best Practices
+
+### Modern Syntax (Use These):
+```yaml
+# ✅ CORRECT - Modern Kustomize syntax
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:           # ← Use 'resources' (not 'bases')
+  - ../../base
+
+patches:             # ← Use 'patches' (not 'patchesStrategicMerge')
+  - path: replica-patch.yaml
+```
+
+### Deprecated Syntax (Don't Use):
+```yaml
+# ❌ DEPRECATED - Old syntax
+bases:                      # Deprecated, use 'resources'
+  - ../../base
+
+patchesStrategicMerge:      # Deprecated, use 'patches'
+  - replica-patch.yaml
+```
+
+### Patch Files Must Include Namespace
+
+**❌ WRONG - Missing namespace:**
+```yaml
+# This will fail with "no matches for Id Deployment.v1.apps/backend.[noNs]"
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  # Missing namespace!
+spec:
+  replicas: 1
+```
+
+**✅ CORRECT - Include namespace:**
+```yaml
+# Patch must match the namespace in base manifests
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: expense-tracker  # ← Must match base namespace
+spec:
+  replicas: 1
+```
+
+**Why:** Kustomize matches patches to base resources by `apiVersion`, `kind`, `name`, AND `namespace`. If namespace is missing, Kustomize can't find the target resource to patch.
+
+### Kustomize Workflow
+
+1. **Preview changes before applying:**
+   ```bash
+   kubectl kustomize k8s/overlays/staging/
+   ```
+   - Shows final YAML that will be applied
+   - Verifies patches are working correctly
+   - Checks namespace transformations
+
+2. **Apply with Kustomize:**
+   ```bash
+   kubectl apply -k k8s/overlays/staging/
+   ```
+   - Applies all resources in one command
+   - Handles dependencies automatically
+
+3. **Delete with Kustomize:**
+   ```bash
+   kubectl delete -k k8s/overlays/staging/
+   ```
+   - Deletes all resources created by Kustomize
+
+### Common Kustomize Errors
+
+**Error: "no matches for Id Deployment.v1.apps/backend.[noNs]"**
+- **Cause:** Patch file missing `namespace` field
+- **Fix:** Add `namespace: <base-namespace>` to patch metadata
+
+**Error: "'bases' is deprecated"**
+- **Cause:** Using old Kustomize syntax
+- **Fix:** Change `bases:` to `resources:`
+
+**Error: "'patchesStrategicMerge' is deprecated"**
+- **Cause:** Using old patch syntax
+- **Fix:** Change `patchesStrategicMerge:` to `patches:` with `path:` field
 - Configure health probes:
   - **Liveness probe**: `/actuator/health/liveness` for backend
   - **Readiness probe**: `/actuator/health/readiness` for backend
@@ -1131,12 +1398,188 @@ describe('Button', () => {
 - **Peer dependency conflicts**: Use `--legacy-peer-deps` flag with npm ci
 - **Cache invalidation**: Copy package files before source files to leverage Docker layer caching
 
+# Common Deployment Issues and Solutions
+
+## Issue 1: Image Pull Failures (403 Forbidden)
+
+**Symptom:**
+```
+Failed to pull image: 403 Forbidden
+Error: ErrImagePull / ImagePullBackOff
+```
+
+**Root Cause:** GKE service account lacks permission to pull from Artifact Registry.
+
+**Solution:**
+Always grant `roles/artifactregistry.reader` to the GKE service account:
+
+```hcl
+# In terraform/main.tf
+resource "google_project_iam_member" "gke_sa_roles" {
+  for_each = toset([
+    "roles/logging.logWriter",
+    "roles/monitoring.metricWriter",
+    "roles/monitoring.viewer",
+    "roles/stackdriver.resourceMetadata.writer",
+    "roles/artifactregistry.reader"  # REQUIRED for image pulls
+  ])
+  project = var.project_id
+  role    = each.key
+  member  = "serviceAccount:${google_service_account.gke_sa.email}"
+}
+```
+
+---
+
+## Issue 2: Stale Images (ImagePullPolicy)
+
+**Symptom:** New images pushed but pods still use old images.
+
+**Root Cause:** Default `imagePullPolicy: IfNotPresent` caches images by tag.
+
+**Solution:**
+Set `imagePullPolicy: Always` in deployments when reusing tags:
+
+```yaml
+# In k8s/base/*-deployment.yaml
+containers:
+- name: backend
+  image: gcr.io/PROJECT_ID/backend:v1.0.0
+  imagePullPolicy: Always  # Force pull on every pod creation
+```
+
+**Best Practice:**
+- **Development:** Use `imagePullPolicy: Always` with tags like `v1.0.0`
+- **Production:** Use immutable tags (e.g., git SHA) with `IfNotPresent`
+
+---
+
+## Issue 3: Database Schema Validation Failures
+
+**Symptom:**
+```
+Schema-validation: missing table [table_name]
+```
+
+**Root Cause:** Hibernate set to `validate` mode but database is empty.
+
+**Solution:**
+Use appropriate `ddl-auto` setting for each environment:
+
+```yaml
+# application-dev.yml (local development)
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop  # Recreate schema on startup
+
+# application-prod.yml (first deployment)
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: update  # Auto-create/update tables
+
+# application-prod.yml (after initial deployment)
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate  # Only validate, don't modify
+```
+
+**Best Practice:**
+1. First deployment: Use `update` to create schema
+2. After stable: Switch to `validate` for safety
+3. Use database migration tools (Flyway/Liquibase) for production
+
+---
+
+## Issue 4: Ingress Static IP Mismatch
+
+**Symptom:**
+```
+Error: the given static IP name 'X' doesn't translate to an existing static IP
+```
+
+**Root Cause:** Kubernetes Ingress annotation references wrong static IP name.
+
+**Solution:**
+Use Kustomize patches to override annotations per environment:
+
+```yaml
+# k8s/overlays/staging/kustomization.yaml
+patches:
+  - target:
+      kind: Ingress
+      name: expense-tracker-ingress
+    patch: |-
+      - op: replace
+        path: /metadata/annotations/kubernetes.io~1ingress.global-static-ip-name
+        value: expense-tracker-staging-ingress-ip  # Match Terraform output
+```
+
+**Best Practice:**
+- Ensure Terraform static IP names match Kubernetes ingress annotations
+- Use environment-specific patches in Kustomize overlays
+- Verify with: `gcloud compute addresses list --global`
+
+---
+
+## Issue 5: Terragrunt Environment Variables
+
+**Symptom:**
+```
+Error: bucket doesn't exist
+Error: get_env("GCP_PROJECT_ID") returns empty string
+```
+
+**Root Cause:** Environment variables not persisting between commands.
+
+**Solution:**
+Hardcode environment-specific values in `terragrunt.hcl`:
+
+```hcl
+# ❌ BAD - Requires manual env var
+remote_state {
+  config = {
+    bucket = "terraform-state-${get_env("GCP_PROJECT_ID")}"
+    project = get_env("GCP_PROJECT_ID")
+  }
+}
+
+# ✅ GOOD - Hardcoded per environment
+# terraform/environments/staging/terragrunt.hcl
+inputs = {
+  project_id = "sol-sand"
+  environment = "staging"
+}
+
+# terraform/terragrunt.hcl (root)
+remote_state {
+  config = {
+    bucket = "expense-tracker-terraform-state-sol-sand"
+    project = "sol-sand"
+  }
+}
+```
+
+**Best Practice:**
+- Use `inputs` in environment-specific `terragrunt.hcl` files
+- Avoid `get_env()` for critical configuration
+- Document required variables in README
+
+---
+
 # Best Practices Checklist
 
 When creating a new project or service:
 - [ ] Kubernetes manifests created in `k8s/` directory
 - [ ] GitHub Actions workflows for CI in `.github/workflows/`
 - [ ] Terraform configurations for infrastructure in `terraform/`
+- [ ] **GKE service account has `roles/artifactregistry.reader`**
+- [ ] **Deployments use `imagePullPolicy: Always` for development**
+- [ ] **Hibernate `ddl-auto` set appropriately per environment**
+- [ ] **Ingress static IP names match Terraform outputs**
+- [ ] **Terragrunt uses hardcoded values, not environment variables**
 - [ ] External Secrets configured to pull from GCP Secret Manager
 - [ ] Health probes and resource limits defined in K8s deployments
 - [ ] Multi-stage Dockerfiles for optimized image builds
